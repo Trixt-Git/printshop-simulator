@@ -15,7 +15,8 @@ try:
     xl_conf  = {str(row[0]).strip(): row[1] for _, row in df_all.iterrows()}
 except Exception as e:
     print(f"❌ Excel Sync Error: {e}")
-    sys.exit(1)
+    xl_conf = {}
+
 
 # 1.3 — GLOBAL CONFIG
 RANDOM_SEED     = int(xl_conf.get("RANDOM_SEED", 42))
