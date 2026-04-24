@@ -115,8 +115,12 @@ def generate_dataset(overrides=None):
     ink_configs  = list(PLATE_COSTS.keys())
     ink_weights  = normalize([0.45, 0.25, 0.15, 0.15])
     ink_config   = np.random.choice(ink_configs, n, p=ink_weights)
-    qty_ordered  = np.random.choice(QTY_OPTIONS, n)
-
+    qty_ordered  = np.random.normal(
+        conf.get("AVG_RUN_SIZE", 40000),
+        conf.get("AVG_RUN_SIZE", 40000) *0.4,
+        n
+    ).astype(int).clip(5000, 200000)
+    
     # 4.3 — WASTE: continuous drift (age + shift + substrate)
     night_w_mult   = np.where(is_night, conf.get("NIGHT_WASTE_FACTOR", 1.15), 1.0)
     foil_w_mult    = np.where(is_foil,  conf.get("FOIL_WASTE_FACTOR",  1.25), 1.0)
@@ -218,6 +222,14 @@ def generate_dataset(overrides=None):
     job_markup = np.array([markups_dict[c] for c in selected_custs])
     job_markup = np.where(is_foil, job_markup + conf.get("COMPLEXITY_PREMIUM_FOIL", 0.15), job_markup)
 
+    #Standard speed for billing - what the press should run at spec
+    std_speed = np.where(is_foil & is_perfecting, conf.get("BASE_SPEED_FOIL_PERFECTING", 6500),
+                np.where(is_foil,              conf.get("BASE_SPEED_FOIL_SHEETFED",   7500),
+                np.where(is_perfecting,         conf.get("BASE_SPEED_WHITE_PERFECTING",9500),
+                                                 conf.get("BASE_SPEED_WHITE_SHEETFED", 10500))))
+
+    
+    
     # Billing basis: revenue on what the customer ordered, not actual sheets run
     # Waste, jams, and QC hits eat margin — the shop absorbs them
     billing_basis = (
@@ -225,7 +237,7 @@ def generate_dataset(overrides=None):
                                conf.get("STOCK_COST_FOIL",  320) / 1000,
                                conf.get("STOCK_COST_WHITE",  55) / 1000)
         + qty_ordered * cov * 4 / 50000 * conf.get("INK_COST_PER_LB", 20) * ink_premium
-        + (qty_ordered * passes / act_speed + mkrdy_time / 60) * bill_rate
+        + (qty_ordered * passes / std_speed + mkrdy_time / 60) * bill_rate
         + plt_c
         + qty_ordered * np.array([FINISHING_PER_SHEET[c] for c in ink_config])
     ).round(2)

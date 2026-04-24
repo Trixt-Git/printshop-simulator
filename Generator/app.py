@@ -2,6 +2,10 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 from trading_card_generate_dataset import generate_dataset
+import plotly.io as pio
+pio.renderers.default = "browser"
+
+
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────
 st.set_page_config(page_title="Print Shop Simulator", layout="wide")
@@ -213,17 +217,14 @@ with col2:
              .sum()
              .reset_index()
              .sort_values("job_date"))
-    trend = trend.set_index("job_date")
-    smoothed = (trend.groupby("customer")["revenue"]
-                .transform(lambda x: x.rolling(30, min_periods=1).mean()))
-    trend["smoothed"] = smoothed.values
-    trend = trend.reset_index()
-    fig = px.line(trend, x="job_date", y="smoothed", color="customer",
+    trend["cumulative_revenue"] = trend.groupby("customer")["revenue"].cumsum()
+    fig = px.line(trend, x="job_date", y="cumulative_revenue", color="customer",
                   color_discrete_sequence=["#4A90A4", "#F5A623", "#00C875"])
-    fig.update_layout(xaxis_title="Date", yaxis_title="Avg Daily Revenue",
+    fig.update_layout(xaxis_title="Date", yaxis_title="Cumulative Revenue",
                       yaxis_tickprefix="$", yaxis_tickformat=",",
                       legend_title="Customer")
     st.plotly_chart(fig, use_container_width=True)
+
 
 # ── ROW 2: QC FAIL BY PRESS + MARGIN TREND ────────────────────────────────
 col3, col4 = st.columns(2)
