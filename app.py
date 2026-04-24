@@ -14,13 +14,27 @@ st.sidebar.header("Simulation Controls")
 
 st.sidebar.subheader("Press Age Factors")
 st.sidebar.caption("Fleet baseline: 1.15 (best) → 1.50 (worst). No press in this fleet is at 1.0.")
-age_2190 = st.sidebar.slider("2190 KBA106 — Perfecting",  1.0, 2.0, 1.15, step=0.05)
-age_2160 = st.sidebar.slider("2160 840 Komori — Sheetfed", 1.0, 2.0, 1.30, step=0.05)
-age_2150 = st.sidebar.slider("2150 640 Komori — Sheetfed", 1.0, 2.0, 1.25, step=0.05)
-age_2500 = st.sidebar.slider("2500 640 Komori — Sheetfed", 1.0, 2.0, 1.20, step=0.05)
-age_2330 = st.sidebar.slider("2330 640 Komori — Sheetfed", 1.0, 2.0, 1.20, step=0.05)
-age_2060 = st.sidebar.slider("2060 KBA105 — Perfecting",  1.0, 2.0, 1.50, step=0.05,
-                              help="Most unreliable press in fleet")
+
+age_options = {
+    "1.15 — Best maintained": 1.15,
+    "1.20 — Solid":           1.20,
+    "1.25 — Middle of road":  1.25,
+    "1.30 — Some wear":       1.30,
+    "1.40 — Aging":           1.40,
+    "1.50 — Most unreliable": 1.50,
+    "1.60 — Degraded":        1.60,
+    "1.80 — End of life":     1.80,
+    "2.00 — Critical":        2.00,
+}
+age_keys = list(age_options.keys())
+
+age_2190 = age_options[st.sidebar.selectbox("2190 KBA106 — Perfecting",  age_keys, index=0)]
+age_2500 = age_options[st.sidebar.selectbox("2500 640 Komori — Sheetfed", age_keys, index=1)]
+age_2330 = age_options[st.sidebar.selectbox("2330 640 Komori — Sheetfed", age_keys, index=1)]
+age_2150 = age_options[st.sidebar.selectbox("2150 640 Komori — Sheetfed", age_keys, index=2)]
+age_2160 = age_options[st.sidebar.selectbox("2160 840 Komori — Sheetfed", age_keys, index=3)]
+age_2060 = age_options[st.sidebar.selectbox("2060 KBA105 — Perfecting",  age_keys, index=5,
+                                             help="Most unreliable press in fleet")]
 
 st.sidebar.subheader("Night Shift")
 night_waste   = st.sidebar.slider("Night Waste Factor",   1.0, 1.5, 1.15, step=0.05)
