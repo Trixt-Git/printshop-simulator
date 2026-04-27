@@ -15,8 +15,7 @@ try:
     xl_conf  = {str(row[0]).strip(): row[1] for _, row in df_all.iterrows()}
 except Exception as e:
     print(f"❌ Excel Sync Error: {e}")
-    xl_conf = {}
-
+    sys.exit(1)
 
 # 1.3 — GLOBAL CONFIG
 RANDOM_SEED     = int(xl_conf.get("RANDOM_SEED", 42))
@@ -31,13 +30,6 @@ SHIFTS = {
     "Black Night":xl_conf.get("SHIFT_MIX_BLACK_NIGHT",0.25),
 }
 
-# 2.2 — LAYOUT & STOCK (100-up = Foil | 121-up = White)
-LAYOUT_MIX = {
-    (121, "White"): xl_conf.get("MIX_121_PLAIN", 0.40),
-    (121, "Foil"):  xl_conf.get("MIX_121_HOLO",  0.25),
-    (100, "White"): xl_conf.get("MIX_100_PLAIN", 0.15),
-    (100, "Foil"):  xl_conf.get("MIX_100_HOLO",  0.20),
-}
 
 # 3.1 — WASTE BASE (Stock, Ink Config)
 WASTE_BASE = {
@@ -81,7 +73,20 @@ def generate_dataset(overrides=None):
         "2330": ("Sheetfed",   conf.get("SHARE_2330", 0.08), conf.get("AGE_FACTOR_2330", 1.20)),
         "2060": ("Perfecting", conf.get("SHARE_2060", 0.06), conf.get("AGE_FACTOR_2060", 1.50)),
     }
+    #___Layout Mix ___
+    layout_mix = {
+        (121, "White"): conf.get("MIX_121_PLAIN", 0.40),
+        (121, "Foil"):  conf.get("MIX_121_HOLO",  0.25),
+        (100, "White"): conf.get("MIX_100_PLAIN", 0.15),
+        (100, "Foil"):  conf.get("MIX_100_HOLO",  0.20),
+    }
+    #Billing Speed Reference 
+    BILLING_SPEED_WHITE_SF = 10500
+    BILLING_SPEED_WHITE_PF = 9500
+    BILLING_SPEED_FOIL_SF  = 7500
+    BILLING_SPEED_FOIL_PF  = 6500
 
+    
     n = int(conf.get("NUM_JOBS", 5000))
     np.random.seed(RANDOM_SEED)
     random.seed(RANDOM_SEED)
@@ -97,8 +102,8 @@ def generate_dataset(overrides=None):
              conf.get("SPOT_JOB_SHARE",0.1)]
     selected_custs = np.random.choice(c_ids, n, p=normalize(c_p))
 
-    layouts = list(LAYOUT_MIX.keys())
-    idx = np.random.choice(len(layouts), n, p=normalize(list(LAYOUT_MIX.values())))
+    layouts = list(layout_mix.keys())
+    idx = np.random.choice(len(layouts), n, p=normalize(list(layout_mix.values())))
     cards_per_sheet = np.array([layouts[i][0] for i in idx])
     stock_type      = np.array([layouts[i][1] for i in idx])
 
@@ -116,11 +121,8 @@ def generate_dataset(overrides=None):
     ink_configs  = list(PLATE_COSTS.keys())
     ink_weights  = normalize([0.45, 0.25, 0.15, 0.15])
     ink_config   = np.random.choice(ink_configs, n, p=ink_weights)
-    qty_ordered  = np.random.normal(
-        conf.get("AVG_RUN_SIZE", 40000),
-        conf.get("AVG_RUN_SIZE", 40000) *0.4,
-        n
-    ).astype(int).clip(5000, 200000)
+    avg_run      = conf.get("AVG_RUN_SIZE", 40000)
+    qty_ordered  = np.random.normal(avg_run,avg_run*0.4,n).astype(int).clip(5000,200000)
     
     # 4.3 — WASTE: continuous drift (age + shift + substrate)
     night_w_mult   = np.where(is_night, conf.get("NIGHT_WASTE_FACTOR", 1.15), 1.0)
@@ -193,15 +195,18 @@ def generate_dataset(overrides=None):
     cov        = np.random.uniform(conf.get("INK_COVERAGE_MIN", 0.55),
                                    conf.get("INK_COVERAGE_MAX", 0.90), n)
     ink_premium = np.where(np.char.find(ink_config, "4/4 CMYK") > -1, 1.0, 1.6)
-    ink_cost    = (sheets_run * cov * 4 / 50000
+    ink_yield   = conf.get("INK_YIELD_SHEETS_PER_LB", 50000)
+    ink_cost    = (sheets_run * cov * 4 / ink_yield
                    * conf.get("INK_COST_PER_LB", 20) * ink_premium).round(2)
 
     # Cost rate — what it actually costs to run the press
     base_cost_rate = np.where(is_perfecting,
-                              conf.get("PERFECTING_RATE_HR",    125),
-                              conf.get("SHEETFED_RATE_HR",      110))
-    labor_rate = np.where(is_night, base_cost_rate + 4.0, base_cost_rate)
-    press_cost = (total_time * labor_rate).round(2)
+                              conf.get("PERFECTING_RATE_HR",    150),
+                              conf.get("SHEETFED_RATE_HR",      140))
+    burden_rate = conf.get("BURDEN_RATE_HR", 0)
+    labor_rate  = np.where(is_night, base_cost_rate + burden_rate + 4.0,
+                                     base_cost_rate + burden_rate)
+    press_cost  = (total_time * labor_rate).round(2)
 
     # Billing rate — what we charge the customer
     base_bill_rate = np.where(is_perfecting,
@@ -223,22 +228,21 @@ def generate_dataset(overrides=None):
     job_markup = np.array([markups_dict[c] for c in selected_custs])
     job_markup = np.where(is_foil, job_markup + conf.get("COMPLEXITY_PREMIUM_FOIL", 0.15), job_markup)
 
-    #Standard speed for billing - what the press should run at spec
-    std_speed = np.where(is_foil & is_perfecting, conf.get("BASE_SPEED_FOIL_PERFECTING", 6500),
-                np.where(is_foil,              conf.get("BASE_SPEED_FOIL_SHEETFED",   7500),
-                np.where(is_perfecting,         conf.get("BASE_SPEED_WHITE_PERFECTING",9500),
-                                                 conf.get("BASE_SPEED_WHITE_SHEETFED", 10500))))
-
-    
-    
     # Billing basis: revenue on what the customer ordered, not actual sheets run
     # Waste, jams, and QC hits eat margin — the shop absorbs them
+    # Uses bill_speed (no age degradation) — age slowdowns are the shop's problem
+    bill_speed = np.where(is_foil & is_perfecting, BILLING_SPEED_FOIL_PF,
+                np.where(is_foil,                  BILLING_SPEED_FOIL_SF,
+                np.where(is_perfecting,            BILLING_SPEED_WHITE_PF,
+                                                   BILLING_SPEED_WHITE_SF,
+                                                   )))
+
     billing_basis = (
         qty_ordered * np.where(is_foil,
                                conf.get("STOCK_COST_FOIL",  320) / 1000,
                                conf.get("STOCK_COST_WHITE",  55) / 1000)
-        + qty_ordered * cov * 4 / 50000 * conf.get("INK_COST_PER_LB", 20) * ink_premium
-        + (qty_ordered * passes / std_speed + mkrdy_time / 60) * bill_rate
+        + qty_ordered * cov * 4 / ink_yield * conf.get("INK_COST_PER_LB", 20) * ink_premium
+        + (qty_ordered * passes / bill_speed + mkrdy_time / 60) * bill_rate
         + plt_c
         + qty_ordered * np.array([FINISHING_PER_SHEET[c] for c in ink_config])
     ).round(2)

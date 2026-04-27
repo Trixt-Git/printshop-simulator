@@ -2,10 +2,6 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 from trading_card_generate_dataset import generate_dataset
-import plotly.io as pio
-pio.renderers.default = "browser"
-
-
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────
 st.set_page_config(page_title="Print Shop Simulator", layout="wide")
@@ -15,6 +11,13 @@ st.caption("Move any slider to rerun the simulation and see the system respond."
 
 # ── SIDEBAR CONTROLS ──────────────────────────────────────────────────────
 st.sidebar.header("Simulation Controls")
+
+# ── BASELINE BUTTON ───────────────────────────────────────────────────────
+set_baseline = st.sidebar.button("📊 Set as Baseline", use_container_width=True)
+if st.session_state.get("baseline_set"):
+    st.sidebar.caption("✅ Baseline set — move sliders to compare")
+
+st.sidebar.divider()
 
 # ── FINANCIAL RATES ───────────────────────────────────────────────────────
 with st.sidebar.expander("Financial Rates", expanded=False):
@@ -155,6 +158,7 @@ overrides = {
     "PERFECTING_RATE_HR":         pf_cost_rate,
     "SHEETFED_BILL_RATE_HR":      sf_bill_rate,
     "PERFECTING_BILL_RATE_HR":    pf_bill_rate,
+    "BURDEN_RATE_HR":             0,
     "STOCK_COST_WHITE":           stock_white,
     "STOCK_COST_FOIL":            stock_foil,
     "INK_COST_PER_LB":            ink_cost,
@@ -176,14 +180,48 @@ overrides = {
 with st.spinner("Running simulation..."):
     df = run_sim(tuple(sorted(overrides.items())))
 
+# ── BASELINE ──────────────────────────────────────────────────────────────
+if "baseline_df" not in st.session_state:
+    st.session_state.baseline_df = df.copy()
+    st.session_state.baseline_set = False
+
+if set_baseline:
+    st.session_state.baseline_df = df.copy()
+    st.session_state.baseline_set = True
+
+baseline = st.session_state.baseline_df
+
 # ── KPI STRIP ─────────────────────────────────────────────────────────────
 st.subheader("Top Line")
 k1, k2, k3, k4, k5 = st.columns(5)
-k1.metric("Total Profit",  f"${df['gross_profit'].sum():,.0f}")
-k2.metric("Avg Margin",    f"{df['gross_margin_pct'].mean():.1f}%")
-k3.metric("Late Rate",     f"{(df['delivery_status']=='LATE').mean():.1%}")
-k4.metric("Avg Waste",     f"{df['waste_pct'].mean():.1f}%")
-k5.metric("QC Fail Rate",  f"{(df['quality_pass']==0).mean():.1%}")
+
+cur_profit  = df["gross_profit"].sum()
+cur_margin  = df["gross_margin_pct"].mean()
+cur_late    = (df["delivery_status"] == "LATE").mean() * 100
+cur_waste   = df["waste_pct"].mean()
+cur_qc_fail = (df["quality_pass"] == 0).mean() * 100
+
+base_profit  = baseline["gross_profit"].sum()
+base_margin  = baseline["gross_margin_pct"].mean()
+base_late    = (baseline["delivery_status"] == "LATE").mean() * 100
+base_waste   = baseline["waste_pct"].mean()
+base_qc_fail = (baseline["quality_pass"] == 0).mean() * 100
+profit_diff = cur_profit - base_profit
+
+k1.metric("Total Profit", f"${cur_profit:,.0f}",
+          delta=f"{'-' if profit_diff < 0 else ''}${abs(profit_diff):,.0f}", 
+          delta_color="normal")
+k2.metric("Avg Margin",    f"{cur_margin:.1f}%",
+          delta=f"{cur_margin - base_margin:.1f}%")
+k3.metric("Late Rate",     f"{cur_late:.1f}%",
+          delta=f"{cur_late - base_late:.1f}%",
+          delta_color="inverse")
+k4.metric("Avg Waste",     f"{cur_waste:.1f}%",
+          delta=f"{cur_waste - base_waste:.1f}%",
+          delta_color="inverse")
+k5.metric("QC Fail Rate",  f"{cur_qc_fail:.1f}%",
+          delta=f"{cur_qc_fail - base_qc_fail:.1f}%",
+          delta_color="inverse")
 
 st.divider()
 
@@ -220,11 +258,10 @@ with col2:
     trend["cumulative_revenue"] = trend.groupby("customer")["revenue"].cumsum()
     fig = px.line(trend, x="job_date", y="cumulative_revenue", color="customer",
                   color_discrete_sequence=["#4A90A4", "#F5A623", "#00C875"])
-    fig.update_layout(xaxis_title="Date", yaxis_title="Cumulative Revenue",
+    fig.update_layout(xaxis_title="Date", yaxis_title="Avg Daily Revenue",
                       yaxis_tickprefix="$", yaxis_tickformat=",",
                       legend_title="Customer")
     st.plotly_chart(fig, use_container_width=True)
-
 
 # ── ROW 2: QC FAIL BY PRESS + MARGIN TREND ────────────────────────────────
 col3, col4 = st.columns(2)

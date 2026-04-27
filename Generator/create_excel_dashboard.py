@@ -1,7 +1,7 @@
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 import os
-#TEST#
+
 def create_control_panel():
     wb = openpyxl.Workbook()
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -83,13 +83,15 @@ def create_control_panel():
     row = row + 1
 
     row = add_section(ws_back, row, "2. Financials & Costs")
-    row = add_var(ws_back, row, "SHEETFED_RATE_HR",      110, "Actual cost to run SF press per hour (fully loaded)")
-    row = add_var(ws_back, row, "PERFECTING_RATE_HR",    125, "Actual cost to run PF press per hour (fully loaded)")
-    row = add_var(ws_back, row, "SHEETFED_BILL_RATE_HR", 250, "Hourly rate billed to customer for SF press time")
-    row = add_var(ws_back, row, "PERFECTING_BILL_RATE_HR",285, "Hourly rate billed to customer for PF press time")
-    row = add_var(ws_back, row, "STOCK_COST_WHITE", 55,  "Cost per MSF White")
-    row = add_var(ws_back, row, "STOCK_COST_FOIL",  320, "Cost per MSF Foil")
-    row = add_var(ws_back, row, "INK_COST_PER_LB",  20,  "Cost of ink per lb")
+    row = add_var(ws_back, row, "SHEETFED_RATE_HR",          140,   "Actual cost to run SF press per hour (direct labor only)")
+    row = add_var(ws_back, row, "PERFECTING_RATE_HR",        150,   "Actual cost to run PF press per hour (direct labor only)")
+    row = add_var(ws_back, row, "BURDEN_RATE_HR",            0,     "Overhead allocation per press hour — add when known (rent, utilities, depreciation)")
+    row = add_var(ws_back, row, "SHEETFED_BILL_RATE_HR",     250,   "Hourly rate billed to customer for SF press time")
+    row = add_var(ws_back, row, "PERFECTING_BILL_RATE_HR",   285,   "Hourly rate billed to customer for PF press time")
+    row = add_var(ws_back, row, "STOCK_COST_WHITE",          55,    "Cost per MSF White")
+    row = add_var(ws_back, row, "STOCK_COST_FOIL",           320,   "Cost per MSF Foil")
+    row = add_var(ws_back, row, "INK_COST_PER_LB",           20,    "Cost of ink per lb")
+    row = add_var(ws_back, row, "INK_YIELD_SHEETS_PER_LB",   50000, "Sheet-sides per lb of ink at 100% coverage — calibrate against real consumption data")
     row = row + 1
 
     row = add_section(ws_back, row, "3. Base Speeds & Output Math")
