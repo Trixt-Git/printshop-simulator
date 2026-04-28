@@ -90,8 +90,9 @@ def generate_dataset(overrides=None):
     }
 
     n = int(conf.get("NUM_JOBS", 5000))
-    np.random.seed(RANDOM_SEED)
-    random.seed(RANDOM_SEED)
+    local_seed = int(conf.get("RANDOM_SEED", 42))
+    np.random.seed(local_seed)
+    random.seed(local_seed)
 
     # 4.1 — SAMPLING
     selected_shifts = np.random.choice(
@@ -145,7 +146,7 @@ def generate_dataset(overrides=None):
 
     color_delta_e    = (np.random.exponential(delta_e_base, n) * drift).clip(0.1, 9.0).round(2)
     register_error   = (np.random.exponential(register_base, n) * drift).clip(0.0, 5.0).round(3)
-    dot_gain_pct     = (np.random.normal(21, 3, n) * night_q_mult).clip(10, 38).round(1)
+    dot_gain_pct     = (np.random.normal(21, 3, n) * drift).clip(10, 38).round(1)
     cut_deviation_mm = (np.random.exponential(0.12, n) * drift).clip(0.0, 1.5).round(3)
     foil_adhesion    = np.where(is_foil, np.random.normal(88, 8, n).clip(40, 100), np.nan)
 
@@ -180,7 +181,7 @@ def generate_dataset(overrides=None):
                  np.where(is_perfecting,            conf.get("BASE_SPEED_WHITE_PERFECTING",9500),
                                                     conf.get("BASE_SPEED_WHITE_SHEETFED", 10500))))
 
-    act_speed  = (speed_base / press_age) + np.random.normal(0, conf.get("SPEED_NOISE_STD", 400), n)
+    act_speed  = ((speed_base / press_age) + np.random.normal(0, conf.get("SPEED_NOISE_STD", 400), n)).clip(min=1000)
 
     mkrdy_base = np.random.normal(90, conf.get("MAKEREADY_NOISE_STD", 12), n)
     mkrdy_time = np.where(is_perfecting,
@@ -216,7 +217,7 @@ def generate_dataset(overrides=None):
     base_bill_rate = np.where(is_perfecting,
                                conf.get("PERFECTING_BILL_RATE_HR", 285),
                                conf.get("SHEETFED_BILL_RATE_HR",   250))
-    bill_rate = np.where(is_night, base_bill_rate + 4.0, base_bill_rate)
+    bill_rate = base_bill_rate
 
     plt_c = np.array([PLATE_COSTS[c] for c in ink_config])
     fin_c = (sheets_run * np.array([FINISHING_PER_SHEET[c] for c in ink_config])).round(2)
@@ -278,7 +279,7 @@ def generate_dataset(overrides=None):
         "qty_ordered":      qty_ordered,
         "passes":           passes,
         "sheets_run":       sheets_run,
-        "cards_delivered":  sheets_run * cards_per_sheet,
+        "cards_delivered":  qty_ordered * cards_per_sheet,
         "waste_pct":        (((sheets_run - qty_ordered) / sheets_run) * 100).round(2),
         "color_delta_e":    color_delta_e,
         "register_error":   register_error,
