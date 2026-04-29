@@ -129,21 +129,28 @@ def create_control_panel():
     row = row + 1
 
     row = add_section(ws_back, row, "7. Delivery Time Physics")
-    row = add_var(ws_back, row, "LEAD_TIME_MEAN_DAYS", 8,   "Avg days quoted to customer")
-    row = add_var(ws_back, row, "LEAD_TIME_STD_DAYS",  2,   "Std dev of quoted lead time")
-    row = add_var(ws_back, row, "DELIVERY_BASE_DAYS",  3,   "Baseline prep + ship days (24hr plant)")
+    row = add_var(ws_back, row, "LEAD_TIME_MEAN_DAYS", 8,    "Avg days quoted to customer")
+    row = add_var(ws_back, row, "LEAD_TIME_STD_DAYS",  2,    "Std dev of quoted lead time")
+    row = add_var(ws_back, row, "DELIVERY_BASE_DAYS",  6,    "Baseline prep + ship days (24hr plant)")
     row = add_var(ws_back, row, "DELIVERY_HOURS_PER_DAY", 24.0, "Plant runs 24hrs — press hrs to day conversion")
     row = add_var(ws_back, row, "ACTUAL_TIME_STD",     0.75, "Std dev of noise on computed delivery (tight — 24hr plant)")
     row = row + 1
 
-    row = add_section(ws_back, row, "8. General Volume & Customer Shares")
+    row = add_section(ws_back, row, "8. Billing Reference Speeds (change only when renegotiating customer pricing)")
+    row = add_var(ws_back, row, "BILLING_SPEED_WHITE_SF",  10500, "Reference SPH for billing white sheetfed jobs")
+    row = add_var(ws_back, row, "BILLING_SPEED_WHITE_PF",   9500, "Reference SPH for billing white perfecting jobs")
+    row = add_var(ws_back, row, "BILLING_SPEED_FOIL_SF",    7500, "Reference SPH for billing foil sheetfed jobs")
+    row = add_var(ws_back, row, "BILLING_SPEED_FOIL_PF",    6500, "Reference SPH for billing foil perfecting jobs")
+    row = row + 1
+
+    row = add_section(ws_back, row, "9. General Volume & Customer Shares")
     row = add_var(ws_back, row, "CUST_A_SHARE", 0.70, "Major Account")
     row = add_var(ws_back, row, "CUST_B_SHARE", 0.20, "Secondary Account")
     row = add_var(ws_back, row, "SPOT_JOB_SHARE", 0.10, "High-margin Spot Jobs")
     row = add_var(ws_back, row, "RANDOM_SEED", 42, "Seed for reproducible scenarios")
     row = row + 1
 
-    row = add_section(ws_back, row, "9. Complex Matrices (Hardcoded Pointers)")
+    row = add_section(ws_back, row, "10. Complex Matrices (Hardcoded Pointers)")
     row = add_var(ws_back, row, "INK_CONFIG_MIX", "In Code: Sec 3", "Probability of configurations (4/4, UV, etc.)")
     row = add_var(ws_back, row, "WASTE_BASE", "In Code: Sec 3", "Matrix of baseline waste percentages")
     row = add_var(ws_back, row, "QTY_OPTIONS", "In Code: Sec 3", "Distribution of order quantities")

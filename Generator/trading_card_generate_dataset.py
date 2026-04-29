@@ -81,10 +81,10 @@ def generate_dataset(overrides=None):
         (100, "Foil"):  conf.get("MIX_100_HOLO",  0.20),
     }
     #Billing Speed Reference 
-    BILLING_SPEED_WHITE_SF = 10500
-    BILLING_SPEED_WHITE_PF = 9500
-    BILLING_SPEED_FOIL_SF  = 7500
-    BILLING_SPEED_FOIL_PF  = 6500
+    BILLING_SPEED_WHITE_SF = 7500
+    BILLING_SPEED_WHITE_PF = 6500
+    BILLING_SPEED_FOIL_SF  = 4500
+    BILLING_SPEED_FOIL_PF  = 3500
 
     
     n = int(conf.get("NUM_JOBS", 5000))
@@ -121,8 +121,8 @@ def generate_dataset(overrides=None):
     ink_configs  = list(PLATE_COSTS.keys())
     ink_weights  = normalize([0.45, 0.25, 0.15, 0.15])
     ink_config   = np.random.choice(ink_configs, n, p=ink_weights)
-    avg_run      = conf.get("AVG_RUN_SIZE", 40000)
-    qty_ordered  = np.random.normal(avg_run,avg_run*0.4,n).astype(int).clip(5000,200000)
+    avg_run      = conf.get("AVG_RUN_SIZE", 10000)
+    qty_ordered  = np.random.normal(avg_run,avg_run*0.4,n).astype(int).clip(5000,25000)
     
     # 4.3 — WASTE: continuous drift (age + shift + substrate)
     night_w_mult   = np.where(is_night, conf.get("NIGHT_WASTE_FACTOR", 1.15), 1.0)
@@ -130,7 +130,7 @@ def generate_dataset(overrides=None):
     base_run_waste = np.array([WASTE_BASE.get((s, c), 0.04)
                                for s, c in zip(stock_type, ink_config)])
     run_waste_pct  = base_run_waste * press_age * night_w_mult * foil_w_mult
-    mkrdy_scrap    = int(conf.get("MAKEREADY_ATTEMPTS", 5) * conf.get("SHEETS_PER_ATTEMPT", 50))
+    mkrdy_scrap    = int(np.random.normal(180,30))
     run_scrap      = (qty_ordered * run_waste_pct).astype(int)
 
     # 4.3b — 5-POINT QC SYSTEM
@@ -178,7 +178,7 @@ def generate_dataset(overrides=None):
 
     act_speed  = (speed_base / press_age) + np.random.normal(0, conf.get("SPEED_NOISE_STD", 400), n)
 
-    mkrdy_base = np.random.normal(90, conf.get("MAKEREADY_NOISE_STD", 12), n)
+    mkrdy_base = np.random.normal(60, conf.get("MAKEREADY_NOISE_STD", 12), n)
     mkrdy_time = np.where(is_perfecting,
                           mkrdy_base * conf.get("PERFECTING_MAKEREADY_BONUS", 0.8),
                           mkrdy_base)

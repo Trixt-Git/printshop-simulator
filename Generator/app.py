@@ -208,9 +208,10 @@ base_waste   = baseline["waste_pct"].mean()
 base_qc_fail = (baseline["quality_pass"] == 0).mean() * 100
 profit_diff = cur_profit - base_profit
 
-k1.metric("Total Profit", f"${cur_profit:,.0f}",
-          delta=f"{'-' if profit_diff < 0 else ''}${abs(profit_diff):,.0f}", 
-          delta_color="normal")
+k1.metric("Total Profit",      f"${cur_profit:,.0f}",
+          delta=f"{'-' if profit_diff < 0 else ''}${abs(profit_diff):,.0f}",
+          delta_color="normal")  
+
 k2.metric("Avg Margin",    f"{cur_margin:.1f}%",
           delta=f"{cur_margin - base_margin:.1f}%")
 k3.metric("Late Rate",     f"{cur_late:.1f}%",
@@ -255,8 +256,12 @@ with col2:
              .sum()
              .reset_index()
              .sort_values("job_date"))
-    trend["cumulative_revenue"] = trend.groupby("customer")["revenue"].cumsum()
-    fig = px.line(trend, x="job_date", y="cumulative_revenue", color="customer",
+    trend = trend.set_index("job_date")
+    smoothed = (trend.groupby("customer")["revenue"]
+                .transform(lambda x: x.rolling(30, min_periods=1).mean()))
+    trend["smoothed"] = smoothed.values
+    trend = trend.reset_index()
+    fig = px.line(trend, x="job_date", y="smoothed", color="customer",
                   color_discrete_sequence=["#4A90A4", "#F5A623", "#00C875"])
     fig.update_layout(xaxis_title="Date", yaxis_title="Avg Daily Revenue",
                       yaxis_tickprefix="$", yaxis_tickformat=",",
