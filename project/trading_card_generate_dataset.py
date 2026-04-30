@@ -30,13 +30,6 @@ SHIFTS = {
     "Black Night":xl_conf.get("SHIFT_MIX_BLACK_NIGHT",0.25),
 }
 
-# 2.2 — LAYOUT & STOCK (121-up or 100-up, each available in White or Foil)
-LAYOUT_MIX = {
-    (121, "White"): xl_conf.get("MIX_121_PLAIN", 0.40),
-    (121, "Foil"):  xl_conf.get("MIX_121_HOLO",  0.25),
-    (100, "White"): xl_conf.get("MIX_100_PLAIN", 0.15),
-    (100, "Foil"):  xl_conf.get("MIX_100_HOLO",  0.20),
-}
 
 # 3.1 — WASTE BASE (Stock, Ink Config)
 WASTE_BASE = {
@@ -80,19 +73,23 @@ def generate_dataset(overrides=None):
         "2330": ("Sheetfed",   conf.get("SHARE_2330", 0.08), conf.get("AGE_FACTOR_2330", 1.20)),
         "2060": ("Perfecting", conf.get("SHARE_2060", 0.06), conf.get("AGE_FACTOR_2060", 1.50)),
     }
-
-    # ── LAYOUT MIX (local so slider overrides take effect) ───────────────
+    #___Layout Mix ___
     layout_mix = {
         (121, "White"): conf.get("MIX_121_PLAIN", 0.40),
         (121, "Foil"):  conf.get("MIX_121_HOLO",  0.25),
         (100, "White"): conf.get("MIX_100_PLAIN", 0.15),
         (100, "Foil"):  conf.get("MIX_100_HOLO",  0.20),
     }
+    #Billing Speed Reference 
+    BILLING_SPEED_WHITE_SF = 7500
+    BILLING_SPEED_WHITE_PF = 6500
+    BILLING_SPEED_FOIL_SF  = 4500
+    BILLING_SPEED_FOIL_PF  = 3500
 
+    
     n = int(conf.get("NUM_JOBS", 5000))
-    local_seed = int(conf.get("RANDOM_SEED", 42))
-    np.random.seed(local_seed)
-    random.seed(local_seed)
+    np.random.seed(RANDOM_SEED)
+    random.seed(RANDOM_SEED)
 
     # 4.1 — SAMPLING
     selected_shifts = np.random.choice(
@@ -124,18 +121,16 @@ def generate_dataset(overrides=None):
     ink_configs  = list(PLATE_COSTS.keys())
     ink_weights  = normalize([0.45, 0.25, 0.15, 0.15])
     ink_config   = np.random.choice(ink_configs, n, p=ink_weights)
-
-    # AVG_RUN_SIZE drives qty distribution — normal around mean, std = 40% of mean
-    avg_run = conf.get("AVG_RUN_SIZE", 40000)
-    qty_ordered = np.random.normal(avg_run, avg_run * 0.4, n).astype(int).clip(5000, 200000)
-
+    avg_run      = conf.get("AVG_RUN_SIZE", 10000)
+    qty_ordered  = np.random.normal(avg_run,avg_run*0.4,n).astype(int).clip(5000,25000)
+    
     # 4.3 — WASTE: continuous drift (age + shift + substrate)
     night_w_mult   = np.where(is_night, conf.get("NIGHT_WASTE_FACTOR", 1.15), 1.0)
     foil_w_mult    = np.where(is_foil,  conf.get("FOIL_WASTE_FACTOR",  1.25), 1.0)
     base_run_waste = np.array([WASTE_BASE.get((s, c), 0.04)
                                for s, c in zip(stock_type, ink_config)])
     run_waste_pct  = base_run_waste * press_age * night_w_mult * foil_w_mult
-    mkrdy_scrap    = int(conf.get("MAKEREADY_ATTEMPTS", 5) * conf.get("SHEETS_PER_ATTEMPT", 50))
+    mkrdy_scrap    = int(np.random.normal(180,30))
     run_scrap      = (qty_ordered * run_waste_pct).astype(int)
 
     # 4.3b — 5-POINT QC SYSTEM
@@ -146,7 +141,7 @@ def generate_dataset(overrides=None):
 
     color_delta_e    = (np.random.exponential(delta_e_base, n) * drift).clip(0.1, 9.0).round(2)
     register_error   = (np.random.exponential(register_base, n) * drift).clip(0.0, 5.0).round(3)
-    dot_gain_pct     = (np.random.normal(21, 3, n) * drift).clip(10, 38).round(1)
+    dot_gain_pct     = (np.random.normal(21, 3, n) * night_q_mult).clip(10, 38).round(1)
     cut_deviation_mm = (np.random.exponential(0.12, n) * drift).clip(0.0, 1.5).round(3)
     foil_adhesion    = np.where(is_foil, np.random.normal(88, 8, n).clip(40, 100), np.nan)
 
@@ -181,9 +176,9 @@ def generate_dataset(overrides=None):
                  np.where(is_perfecting,            conf.get("BASE_SPEED_WHITE_PERFECTING",9500),
                                                     conf.get("BASE_SPEED_WHITE_SHEETFED", 10500))))
 
-    act_speed  = ((speed_base / press_age) + np.random.normal(0, conf.get("SPEED_NOISE_STD", 400), n)).clip(min=1000)
+    act_speed  = (speed_base / press_age) + np.random.normal(0, conf.get("SPEED_NOISE_STD", 400), n)
 
-    mkrdy_base = np.random.normal(90, conf.get("MAKEREADY_NOISE_STD", 12), n)
+    mkrdy_base = np.random.normal(60, conf.get("MAKEREADY_NOISE_STD", 12), n)
     mkrdy_time = np.where(is_perfecting,
                           mkrdy_base * conf.get("PERFECTING_MAKEREADY_BONUS", 0.8),
                           mkrdy_base)
@@ -217,7 +212,7 @@ def generate_dataset(overrides=None):
     base_bill_rate = np.where(is_perfecting,
                                conf.get("PERFECTING_BILL_RATE_HR", 285),
                                conf.get("SHEETFED_BILL_RATE_HR",   250))
-    bill_rate = base_bill_rate
+    bill_rate = np.where(is_night, base_bill_rate + 4.0, base_bill_rate)
 
     plt_c = np.array([PLATE_COSTS[c] for c in ink_config])
     fin_c = (sheets_run * np.array([FINISHING_PER_SHEET[c] for c in ink_config])).round(2)
@@ -235,12 +230,12 @@ def generate_dataset(overrides=None):
 
     # Billing basis: revenue on what the customer ordered, not actual sheets run
     # Waste, jams, and QC hits eat margin — the shop absorbs them
-    # Billing reference speed — fixed contract rates, not affected by operational speed changes
-    # Change only in Excel when renegotiating customer pricing
-    bill_speed = np.where(is_foil & is_perfecting, conf.get("BILLING_SPEED_FOIL_PF",   6500),
-                 np.where(is_foil,                 conf.get("BILLING_SPEED_FOIL_SF",   7500),
-                 np.where(is_perfecting,            conf.get("BILLING_SPEED_WHITE_PF",  9500),
-                                                    conf.get("BILLING_SPEED_WHITE_SF", 10500))))
+    # Uses bill_speed (no age degradation) — age slowdowns are the shop's problem
+    bill_speed = np.where(is_foil & is_perfecting, BILLING_SPEED_FOIL_PF,
+                np.where(is_foil,                  BILLING_SPEED_FOIL_SF,
+                np.where(is_perfecting,            BILLING_SPEED_WHITE_PF,
+                                                   BILLING_SPEED_WHITE_SF,
+                                                   )))
 
     billing_basis = (
         qty_ordered * np.where(is_foil,
@@ -279,7 +274,7 @@ def generate_dataset(overrides=None):
         "qty_ordered":      qty_ordered,
         "passes":           passes,
         "sheets_run":       sheets_run,
-        "cards_delivered":  qty_ordered * cards_per_sheet,
+        "cards_delivered":  sheets_run * cards_per_sheet,
         "waste_pct":        (((sheets_run - qty_ordered) / sheets_run) * 100).round(2),
         "color_delta_e":    color_delta_e,
         "register_error":   register_error,

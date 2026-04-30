@@ -1,7 +1,7 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
-from trading_card_generate_dataset import generate_dataset
+from Project.Project.trading_card_generate_dataset import generate_dataset
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────
 st.set_page_config(page_title="Print Shop Simulator", layout="wide")
