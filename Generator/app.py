@@ -1,6 +1,9 @@
+import sys
+import os
 import streamlit as st
 import plotly.express as px
 import pandas as pd
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from Project.Project.trading_card_generate_dataset import generate_dataset
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────
@@ -22,10 +25,10 @@ st.sidebar.divider()
 # ── FINANCIAL RATES ───────────────────────────────────────────────────────
 with st.sidebar.expander("Financial Rates", expanded=False):
     st.markdown("**Press Rates ($/hr)**")
-    sf_cost_rate  = st.slider("Sheetfed Cost Rate",    50,  300, 140, step=10)
-    pf_cost_rate  = st.slider("Perfecting Cost Rate",  50,  300, 150, step=10)
-    sf_bill_rate  = st.slider("Sheetfed Bill Rate",   100,  500, 250, step=10)
-    pf_bill_rate  = st.slider("Perfecting Bill Rate", 100,  500, 285, step=10)
+    sf_cost_rate  = st.slider("Sheetfed Cost Rate",    200,  500, 240, step=10)
+    pf_cost_rate  = st.slider("Perfecting Cost Rate",  200,  500, 250, step=10)
+    sf_bill_rate  = st.slider("Sheetfed Bill Rate",   300,  500, 350, step=10)
+    pf_bill_rate  = st.slider("Perfecting Bill Rate", 300,  500, 385, step=10)
     st.markdown("---")
     st.markdown("**Stock Costs**")
     stock_white = st.slider("White Stock ($/MSF)",  20, 150,  55, step=5)
@@ -34,7 +37,7 @@ with st.sidebar.expander("Financial Rates", expanded=False):
 
 # ── PRODUCT MIX ───────────────────────────────────────────────────────────
 with st.sidebar.expander("Product Mix", expanded=False):
-    avg_run_size = st.slider("Avg Run Size (sheets)", 15000, 100000, 40000, step=5000,
+    avg_run_size = st.slider("Avg Run Size (sheets)", 5000, 100000, 10000, step=5000,
                              help="Global average job size. Per-press run size variation to be added in a future update.")
     st.markdown("---")
     st.markdown("**Layout Mix** — relative weights")
@@ -192,37 +195,51 @@ if set_baseline:
 baseline = st.session_state.baseline_df
 
 # ── KPI STRIP ─────────────────────────────────────────────────────────────
-st.subheader("Top Line")
-k1, k2, k3, k4, k5 = st.columns(5)
+# ── KPI STRIP ─────────────────────────────────────────────────────────────
+st.subheader("Core KPI:")
+k1, k2, k3 = st.columns(3)
 
-cur_profit  = df["gross_profit"].sum()
-cur_margin  = df["gross_margin_pct"].mean()
-cur_late    = (df["delivery_status"] == "LATE").mean() * 100
-cur_waste   = df["waste_pct"].mean()
-cur_qc_fail = (df["quality_pass"] == 0).mean() * 100
+cur_profit      = df["gross_profit"].sum()
+cur_lost_hrs    = (df["jam_time_hrs"] + df["qc_downtime_hrs"]).sum()
+cur_throughput  = (df["qty_ordered"] * df["passes"]).sum() / df["total_press_time"].sum()
 
-base_profit  = baseline["gross_profit"].sum()
-base_margin  = baseline["gross_margin_pct"].mean()
-base_late    = (baseline["delivery_status"] == "LATE").mean() * 100
-base_waste   = baseline["waste_pct"].mean()
-base_qc_fail = (baseline["quality_pass"] == 0).mean() * 100
-profit_diff = cur_profit - base_profit
+base_profit     = baseline["gross_profit"].sum()
+base_lost_hrs   = (baseline["jam_time_hrs"] + baseline["qc_downtime_hrs"]).sum()
+base_throughput = (baseline["qty_ordered"] * baseline["passes"]).sum() / baseline["total_press_time"].sum()
 
-k1.metric("Total Profit",      f"${cur_profit:,.0f}",
+profit_diff     = cur_profit - base_profit
+lost_diff       = cur_lost_hrs - base_lost_hrs
+through_diff    = cur_throughput - base_throughput
+
+k1.metric("Profit:",
+          f"${cur_profit:,.0f}",
           delta=f"{'-' if profit_diff < 0 else ''}${abs(profit_diff):,.0f}",
-          delta_color="normal")  
+          delta_color="normal")
 
-k2.metric("Avg Margin",    f"{cur_margin:.1f}%",
-          delta=f"{cur_margin - base_margin:.1f}%")
-k3.metric("Late Rate",     f"{cur_late:.1f}%",
-          delta=f"{cur_late - base_late:.1f}%",
-          delta_color="inverse")
-k4.metric("Avg Waste",     f"{cur_waste:.1f}%",
-          delta=f"{cur_waste - base_waste:.1f}%",
-          delta_color="inverse")
-k5.metric("QC Fail Rate",  f"{cur_qc_fail:.1f}%",
-          delta=f"{cur_qc_fail - base_qc_fail:.1f}%",
-          delta_color="inverse")
+
+waste_material = (df["paper_cost"] * ((df["sheets_run"] - df["qty_ordered"])/df["sheets_run"])).sum()
+lost_time_cost = ((df["jam_time_hrs"]+df["qc_downtime_hrs"])*df["labor_rate"]).sum()
+curr_waste_dollars = waste_material + lost_time_cost
+curr_waste_pct = curr_waste_dollars / df["revenue"].sum()*100
+
+base_waste_material =(baseline["paper_cost"] * ((baseline["sheets_run"] - baseline["qty_ordered"])/baseline["sheets_run"])).sum()
+base_lost_time_cost = ((baseline["jam_time_hrs"]+baseline["qc_downtime_hrs"])*baseline["labor_rate"]).sum()
+base_waste_dollars = base_waste_material + base_lost_time_cost
+waste_diff = curr_waste_dollars - base_waste_dollars    
+
+k2.metric("Waste:",
+          f"${curr_waste_dollars:,.0f} ({curr_waste_pct:.1f}%)",
+          delta=f"${'-' if waste_diff < 0 else ''}{abs(waste_diff):,.0f}",
+          delta_color="inverse" )  
+
+
+
+k3.metric("Throughput",
+          f"{cur_throughput:,.0f} imp/hr",
+          delta=f"{through_diff:+.0f} imp/hr",
+          delta_color="normal")
+
+
 
 st.divider()
 
