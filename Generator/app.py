@@ -25,8 +25,8 @@ st.sidebar.divider()
 # ── FINANCIAL RATES ───────────────────────────────────────────────────────
 with st.sidebar.expander("Financial Rates", expanded=False):
     st.markdown("**Press Rates ($/hr)**")
-    sf_cost_rate  = st.slider("Sheetfed Cost Rate",    200,  500, 240, step=10)
-    pf_cost_rate  = st.slider("Perfecting Cost Rate",  200,  500, 250, step=10)
+    sf_cost_rate  = st.slider("Sheetfed Cost Rate",    200,  400, 220, step=10)
+    pf_cost_rate  = st.slider("Perfecting Cost Rate",  200,  400, 240, step=10)
     sf_bill_rate  = st.slider("Sheetfed Bill Rate",   300,  500, 350, step=10)
     pf_bill_rate  = st.slider("Perfecting Bill Rate", 300,  500, 385, step=10)
     st.markdown("---")
@@ -247,7 +247,7 @@ st.divider()
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("Total Gross Profit by Press")
+    st.markdown("<h3 style='text-align: center;'>Gross Profit by Press</h3>", unsafe_allow_html=True)
     st.caption("Which presses are generating the most value — and which are dragging.")
     profit_by_press = df.groupby("press")["gross_profit"].sum().reset_index()
     profit_by_press.columns = ["press", "total_profit"]
@@ -266,30 +266,37 @@ with col1:
     st.plotly_chart(fig, use_container_width=True)
 
 with col2:
-    st.subheader("Revenue Trend Over Time")
-    st.caption("Cumulative revenue by customer across the simulation period.")
-    df["job_date"] = pd.to_datetime(df["job_date"])
-    trend = (df.groupby(["job_date", "customer"])["revenue"]
-             .sum()
-             .reset_index()
-             .sort_values("job_date"))
-    trend = trend.set_index("job_date")
-    smoothed = (trend.groupby("customer")["revenue"]
-                .transform(lambda x: x.rolling(30, min_periods=1).mean()))
-    trend["smoothed"] = smoothed.values
-    trend = trend.reset_index()
-    fig = px.line(trend, x="job_date", y="smoothed", color="customer",
-                  color_discrete_sequence=["#4A90A4", "#F5A623", "#00C875"])
-    fig.update_layout(xaxis_title="Date", yaxis_title="Avg Daily Revenue",
-                      yaxis_tickprefix="$", yaxis_tickformat=",",
-                      legend_title="Customer")
-    st.plotly_chart(fig, use_container_width=True)
+   st.markdown("<h3 style='text-align: center;'>Margin Distribution by Press</h3>", unsafe_allow_html=True)
+   avg_margin_by_press = df.groupby("press")["gross_margin_pct"].mean()
+   worst_press = avg_margin_by_press.idxmin()
+   st.caption(f"Press {worst_press} drags on margin — distribution shows consistency across the fleet.")
+   color_map = {p: "#FF4455" if p == worst_press else "#4A90A4"
+                for p in avg_margin_by_press.index}
+   press_order = avg_margin_by_press.sort_values().index.tolist()
+   fig = px.box(df, x="press", y="gross_margin_pct",
+                color="press",
+                color_discrete_map=color_map,
+                category_orders={"press": press_order})
+   fig.update_layout(
+       xaxis_title="Press",
+       yaxis_title="Margin %",
+       yaxis_ticksuffix="%",
+       showlegend=False,
+       xaxis_type="category",
+       xaxis=dict(showgrid=False),
+       yaxis=dict(gridcolor="#F0F0F0")
+   )
+   st.plotly_chart(fig, use_container_width=True)
+
+
+
+
 
 # ── ROW 2: QC FAIL BY PRESS + MARGIN TREND ────────────────────────────────
 col3, col4 = st.columns(2)
 
 with col3:
-    st.subheader("QC Failure Rate by Press")
+    st.markdown("<h3 style='text-align: center;'>QC Failure Rate by Press</h3>", unsafe_allow_html=True)
     st.caption("Operational risk. High failure rate = waste, delays, and margin compression.")
     qc_by_press = df.groupby("press")["quality_pass"].apply(
         lambda x: (1 - x.mean()) * 100
@@ -310,7 +317,7 @@ with col3:
     st.plotly_chart(fig, use_container_width=True)
 
 with col4:
-    st.subheader("Revenue by Shift")
+    st.markdown("<h3 style='text-align: center;'>Revenue by Shift</h3>", unsafe_allow_html=True)
     st.caption("Which shifts are generating the most value.")
     rev_by_shift = df.groupby("shift")["revenue"].sum().reset_index()
     rev_by_shift.columns = ["shift", "total_revenue"]
@@ -330,7 +337,7 @@ with col4:
 # ── PRESS SUMMARY TABLE ────────────────────────────────────────────────────
 col5, _ = st.columns([3, 1])
 with col5:
-    st.subheader("Press Performance Summary")
+    st.markdown("<h3 style='text-align: center;'>Gross Profit by Press</h3>", unsafe_allow_html=True)
     press_summary = df.groupby("press").agg(
         qc_pass_rate=("quality_pass", "mean"),
         avg_waste=("waste_pct", "mean"),
@@ -342,12 +349,6 @@ with col5:
     press_summary = press_summary.reindex(["2190","2500","2330","2150","2160","2060"])
     press_summary.index.name = "Press"
     press_summary_display = pd.DataFrame({
-        "QC Pass Rate": press_summary["qc_pass_rate"].map("{:.1%}".format),
-        "Avg Waste %":  press_summary["avg_waste"].map("{:.1f}%".format),
-        "Avg Margin %": press_summary["avg_margin"].map("{:.1f}%".format),
-        "Avg Revenue":  press_summary["avg_revenue"].map("${:,.0f}".format),
-        "Avg Cost":     press_summary["avg_cost"].map("${:,.0f}".format),
-        "Avg Jams":     press_summary["avg_jams"].map("{:.2f}".format),
     }, index=press_summary.index)
     st.dataframe(press_summary_display, use_container_width=True)
 

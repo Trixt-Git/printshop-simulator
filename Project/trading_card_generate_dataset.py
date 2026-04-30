@@ -1,3 +1,4 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
 import os, sys, random
@@ -136,12 +137,12 @@ def generate_dataset(overrides=None):
     # 4.3b — 5-POINT QC SYSTEM
     night_q_mult   = np.where(is_night, conf.get("NIGHT_QUALITY_FACTOR", 1.15), 1.0)
     drift          = press_age * night_q_mult
-    delta_e_base   = np.where(is_foil, 1.0, 0.65)
-    register_base  = np.where(is_foil, 0.5, 0.3)
+    delta_e_base   = np.where(is_foil, 0.15, 0.10)
+    register_base  = np.where(is_foil, 0.08, 0.05)
 
     color_delta_e    = (np.random.exponential(delta_e_base, n) * drift).clip(0.1, 9.0).round(2)
     register_error   = (np.random.exponential(register_base, n) * drift).clip(0.0, 5.0).round(3)
-    dot_gain_pct     = (np.random.normal(21, 3, n) * drift).clip(10, 38).round(1)
+    dot_gain_pct     = (np.random.normal(18, 3, n) * drift).clip(10, 38).round(1)
     cut_deviation_mm = (np.random.exponential(0.12, n) * drift).clip(0.0, 1.5).round(3)
     foil_adhesion    = np.where(is_foil, np.random.normal(88, 8, n).clip(40, 100), np.nan)
 
@@ -157,6 +158,8 @@ def generate_dataset(overrides=None):
 
     qc_scrap        = np.where(quality_pass == 0, int(conf.get("DEFECT_WINDOW_SHEETS", 50)), 0)
     qc_downtime_hrs = np.where(quality_pass == 0, conf.get("QC_READJUST_MINUTES", 15) / 60, 0)
+
+    
 
     # 4.3c — JAM MODEL: discrete mechanical events (run length + age + foil)
     jam_lambda   = (conf.get("JAM_RATE_PER_10K_SHEETS", 0.03)
