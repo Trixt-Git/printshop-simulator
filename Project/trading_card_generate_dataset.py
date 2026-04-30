@@ -141,7 +141,7 @@ def generate_dataset(overrides=None):
 
     color_delta_e    = (np.random.exponential(delta_e_base, n) * drift).clip(0.1, 9.0).round(2)
     register_error   = (np.random.exponential(register_base, n) * drift).clip(0.0, 5.0).round(3)
-    dot_gain_pct     = (np.random.normal(21, 3, n) * night_q_mult).clip(10, 38).round(1)
+    dot_gain_pct     = (np.random.normal(21, 3, n) * drift).clip(10, 38).round(1)
     cut_deviation_mm = (np.random.exponential(0.12, n) * drift).clip(0.0, 1.5).round(3)
     foil_adhesion    = np.where(is_foil, np.random.normal(88, 8, n).clip(40, 100), np.nan)
 
@@ -231,10 +231,10 @@ def generate_dataset(overrides=None):
     # Billing basis: revenue on what the customer ordered, not actual sheets run
     # Waste, jams, and QC hits eat margin — the shop absorbs them
     # Uses bill_speed (no age degradation) — age slowdowns are the shop's problem
-    bill_speed = np.where(is_foil & is_perfecting, BILLING_SPEED_FOIL_PF,
-                np.where(is_foil,                  BILLING_SPEED_FOIL_SF,
-                np.where(is_perfecting,            BILLING_SPEED_WHITE_PF,
-                                                   BILLING_SPEED_WHITE_SF
+    bill_speed = np.where(is_foil & is_perfecting, conf.get(BILLING_SPEED_FOIL_PF, 3500),
+                np.where(is_foil,                  conf.get(BILLING_SPEED_FOIL_SF, 4500),
+                np.where(is_perfecting,            conf.get(BILLING_SPEED_WHITE_PF, 6500),
+                                                    conf.get(BILLING_SPEED_WHITE_SF, 5500),
                                                    )))
 
     billing_basis = (
@@ -296,6 +296,12 @@ def generate_dataset(overrides=None):
         "delivery_quoted":  quoted,
         "delivery_actual":  actual,
         "delivery_status":  delivery_status,
+        "jam_time_hrs":    jam_time_hrs,
+        "qc_downtime_hrs":  qc_downtime_hrs,
+        "mr_hrs":           mkrdy_time/60,
+        "passes":           passes,
+        "labor_rate":       labor_rate,
+        "bill_rate":        bill_rate,
     })
 
 
