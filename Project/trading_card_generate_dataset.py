@@ -234,7 +234,7 @@ def generate_dataset(overrides=None):
     bill_speed = np.where(is_foil & is_perfecting, BILLING_SPEED_FOIL_PF,
                 np.where(is_foil,                  BILLING_SPEED_FOIL_SF,
                 np.where(is_perfecting,            BILLING_SPEED_WHITE_PF,
-                                                   BILLING_SPEED_WHITE_SF,
+                                                   BILLING_SPEED_WHITE_SF
                                                    )))
 
     billing_basis = (
