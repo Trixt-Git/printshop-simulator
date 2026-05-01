@@ -31,8 +31,8 @@ st.markdown("""
     <style>
         /* Tighten overall page padding */
         .block-container {
-            padding-top: 1rem !important;
-            padding-bottom: 1rem !important;
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
         }
 
         /* Reduce gap between all stacked elements */
@@ -60,17 +60,25 @@ st.markdown("""
         /* Chart subheaders */
         h3 {
             margin-bottom: 0rem !important;
-            margin-top: 0.25rem !important;
+            margin-top: 0rem !important;
+        }
+        p {
+            margin-bottom: 0rem !important;
+            margin-top: 0rem !important;
+        }
+        small {
+            margin-bottom: 0rem !important;
+            margin-top: 0rem !important;
         }
 
         /* KPI metrics */
         div[data-testid="stMetric"] {
-            padding: 0.2rem 0 !important;
+            padding: 0.1rem 0 !important;
         }
 
         /* Scenario buttons */
         div[data-testid="stHorizontalBlock"] {
-            gap: 0.5rem !important;
+            gap: 1rem !important;
         }
     </style>
 """, unsafe_allow_html=True)
