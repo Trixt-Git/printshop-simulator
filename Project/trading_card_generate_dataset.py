@@ -72,7 +72,7 @@ def generate_dataset(overrides=None):
         "2150": ("Sheetfed",   conf.get("SHARE_2150", 0.19), conf.get("AGE_FACTOR_2150", 1.25)),
         "2500": ("Sheetfed",   conf.get("SHARE_2500", 0.16), conf.get("AGE_FACTOR_2500", 1.20)),
         "2330": ("Sheetfed",   conf.get("SHARE_2330", 0.08), conf.get("AGE_FACTOR_2330", 1.20)),
-        "2060": ("Perfecting", conf.get("SHARE_2060", 0.06), conf.get("AGE_FACTOR_2060", 1.50)),
+        "2060": ("Sheetfed", conf.get("SHARE_2060", 0.06), conf.get("AGE_FACTOR_2060", 1.50)),
     }
     #___Layout Mix ___
     layout_mix = {
@@ -231,9 +231,12 @@ def generate_dataset(overrides=None):
     job_markup = np.array([markups_dict[c] for c in selected_custs])
     job_markup = np.where(is_foil, job_markup + conf.get("COMPLEXITY_PREMIUM_FOIL", 0.15), job_markup)
 
-    # Billing basis: revenue on what the customer ordered, not actual sheets run
-    # Waste, jams, and QC hits eat margin — the shop absorbs them
-    # Uses bill_speed (no age degradation) — age slowdowns are the shop's problem
+    # ── BILLING BASIS ─────────────────────────────────────────────────────────
+    # TODO: Confirm with estimating how passes affect billing.
+    # Current logic bills on qty_ordered * passes / bill_speed, meaning
+    # perfecting presses bill fewer impressions than sheetfed for the same order.
+    # If billing is flat per job regardless of passes, this section needs rework.
+
     bill_speed = np.where(is_foil & is_perfecting, conf.get(BILLING_SPEED_FOIL_PF, 3500),
                 np.where(is_foil,                  conf.get(BILLING_SPEED_FOIL_SF, 4500),
                 np.where(is_perfecting,            conf.get(BILLING_SPEED_WHITE_PF, 6500),

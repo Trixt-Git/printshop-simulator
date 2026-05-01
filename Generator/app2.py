@@ -10,23 +10,58 @@ from Project.Project.trading_card_generate_dataset import generate_dataset
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────
 st.set_page_config(page_title="Print Shop Simulator", layout="wide")
 
-st.title("Trading Card Print Shop — Operations Simulator")
+st.title("Print Ops Monitor")
+st.set_page_config(page_title="Print Ops Monitor", layout="wide")
+
 st.markdown("""
     <style>
-        /* Target the divider container specifically */
+        /* Tighten overall page padding */
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+        }
+
+        /* Reduce gap between all stacked elements */
+        div[data-testid="stVerticalBlock"] > div {
+            gap: 0.2rem !important;
+        }
+
+        /* Dividers */
         div[data-testid="stDivider"] {
-            margin-top: -10px !important;
-            margin-bottom: -10px !important;
+            margin-top: 4px !important;
+            margin-bottom: 4px !important;
             padding-bottom: 0px !important;
         }
-        
-        /* Optional: Target the line itself if the container fix isn't enough */
         hr {
             margin-top: 0rem !important;
             margin-bottom: 0rem !important;
         }
+
+        /* Title */
+        h1 {
+            margin-bottom: 0.1rem !important;
+            padding-bottom: 0 !important;
+        }
+
+        /* Chart subheaders */
+        h3 {
+            margin-bottom: 0rem !important;
+            margin-top: 0.25rem !important;
+        }
+
+        /* KPI metrics */
+        div[data-testid="stMetric"] {
+            padding: 0.2rem 0 !important;
+        }
+
+        /* Scenario buttons */
+        div[data-testid="stHorizontalBlock"] {
+            gap: 0.5rem !important;
+        }
     </style>
 """, unsafe_allow_html=True)
+
+
 
 # ── SCENARIO DEFINITIONS ──────────────────────────────────────────────────
 SCENARIOS = {
@@ -348,7 +383,7 @@ if active == "default":
         clean_layout(fig1)
         # 3. Completely obliterate both axes
         fig1.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False), margin=dict(t=10, b=0)) 
-        st.plotly_chart(fig1, use_container_width=True)
+        st.plotly_chart(fig1, use_container_width=True,height=350)
 
     with col2:
         # LEFT UNTOUCHED: Box plots require an x-axis to anchor the distribution spread
@@ -366,7 +401,7 @@ if active == "default":
                           xaxis=dict(showgrid=False),
                           yaxis=dict(gridcolor="#EEEEEE", ticksuffix="%"),
                           margin=dict(t=10, b=10))
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, use_container_width=True,height=350)
 
     with col3:
         qc = df.groupby("press")["quality_pass"].apply(lambda x: (1 - x.mean()) * 100).sort_values(ascending=False)
@@ -392,7 +427,7 @@ if active == "default":
         
         clean_layout(fig3)
         fig3.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False), margin=dict(t=10, b=0))
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, use_container_width=True,height=350)
 
     # SHIFT COMPARISONS
     # with col4:
@@ -454,8 +489,8 @@ elif active == "waste":
         )
         
         clean_layout(fig1)
-        fig1.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False), margin=dict(t=10, b=0))
-        st.plotly_chart(fig1, use_container_width=True)
+        fig1.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False,range=[0, wc.max() * 1.15]), margin=dict(t=10, b=0))
+        st.plotly_chart(fig1, use_container_width=True,height=350)
 
     with col2:
         gap = df.groupby("press").apply(
@@ -483,7 +518,7 @@ elif active == "waste":
         
         clean_layout(fig2)
         fig2.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False), margin=dict(t=10, b=0))
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, use_container_width=True,height=350)
 
     with col3:
         waste_shift = df.groupby("shift")["waste_pct"].mean().sort_values(ascending=False)
@@ -509,7 +544,7 @@ elif active == "waste":
         
         clean_layout(fig3)
         fig3.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False), margin=dict(t=10, b=0))
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, use_container_width=True,height=350)
 
     # WASTE TRENDS
     # with col4:
@@ -651,8 +686,8 @@ elif active == "foil":
         
         clean_layout(fig1)
         fig1.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False), margin=dict(t=10, b=0))
-        st.plotly_chart(fig1, use_container_width=True)
-
+        st.plotly_chart(fig1, use_container_width=True,height=350)
+        
     with col2:
         data = comparison_df[comparison_df["Metric"] == "Avg Margin %"].copy()
         winner = "Foil" if foil_vals[1] > white_vals[1] else "White"
@@ -680,7 +715,7 @@ elif active == "foil":
         
         clean_layout(fig2)
         fig2.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False), margin=dict(t=10, b=0))
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, use_container_width=True,height=350)
 
     with col3:
         data = comparison_df[comparison_df["Metric"] == "Waste Cost / Job"].copy()
@@ -708,7 +743,7 @@ elif active == "foil":
         
         clean_layout(fig3)
         fig3.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False), margin=dict(t=10, b=0))
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, use_container_width=True,height=350)
 
     # WHICH RUNS FASTER?
     # with col4:
@@ -765,7 +800,7 @@ elif active == "throughput":
         
         clean_layout(fig1)
         fig1.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False), margin=dict(t=10, b=0))
-        st.plotly_chart(fig1, use_container_width=True)
+        st.plotly_chart(fig1, use_container_width=True,height=350)
 
     with col2:
         lost = df.groupby("press").apply(
@@ -780,7 +815,7 @@ elif active == "throughput":
         ).idxmax()
         
         st.subheader(f"Press {most_lost} Loses the Most Time")
-        st.caption("Hours lost to jams and QC stops. Y-axis removed for clarity.")
+        st.caption("Hours lost to jams and QC stops.")
         
         fig2 = px.bar(lost, x="press", y="Hours", color="Type",
                      color_discrete_map={"Jams": ACCENT, "QC Stops": "#F5A623"},
@@ -789,16 +824,25 @@ elif active == "throughput":
                      
         # Use texttemplate to format the segment values automatically
         fig2.update_traces(texttemplate='<b>%{y:.1f}h</b>', textposition='inside')
+
+        # Press name in QC Stops segment (bigger, sits on top)
+        for trace in fig2.data:
+            if trace.name == "QC Stops":
+                trace.text = [f"<b>{p}</b><br>{h:.1f}h" for p, h in zip(trace.x, trace.y)]
+                trace.texttemplate = None
+                trace.textposition = "inside"
+                trace.insidetextanchor = "middle"
+
         
         clean_layout(fig2)
         # Keep X-axis for category names, drop Y-axis entirely, move legend to top
         fig2.update_layout(
-            yaxis=dict(visible=False),
-            xaxis=dict(showgrid=False, title=None, tickfont=dict(size=14)),
+            yaxis=dict(visible=False, range=[0, lost.groupby("press")["Hours"].sum().max() * 1.15]),
+            xaxis=dict(visible = False, showgrid=False, title=None, tickfont=dict(size=14)),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None),
             margin=dict(t=10, b=0)
         )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, use_container_width=True,height=350)
 
     # PRESS THROUGHPUT ON WARE LEVELS
     # with col3:
@@ -880,7 +924,7 @@ elif active == "throughput":
                       
         clean_layout(fig4)
         fig4.update_layout(xaxis=dict(visible=False), yaxis=dict(visible=False), margin=dict(t=10, b=0))
-        st.plotly_chart(fig4, use_container_width=True)
+        st.plotly_chart(fig4, use_container_width=True,height=350)
 
 
 # ── RAW DATA ──────────────────────────────────────────────────────────────
