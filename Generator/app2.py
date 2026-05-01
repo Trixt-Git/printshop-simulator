@@ -18,7 +18,7 @@ if os.path.exists(os.path.join(target_path, 'Project')):
 else:
     print("Error: 'Project' folder NOT found in that path.")
 
-from Project.Project.trading_card_generate_dataset import generate_dataset
+from Project.trading_card_generate_dataset import generate_dataset
 
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────
