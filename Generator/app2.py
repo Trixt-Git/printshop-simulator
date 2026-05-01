@@ -4,12 +4,10 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 
-# Debugging: See where we are
-print(f"Current File: {__file__}")
-print(f"Current Working Directory: {os.getcwd()}")
+
 
 # The path you are trying to add:
-target_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+target_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 print(f"Adding to sys.path: {target_path}")
 
 sys.path.append(target_path)
