@@ -2,10 +2,26 @@ import sys
 import os
 import streamlit as st
 import plotly.express as px
-import plotly.graph_objects as go
 import pandas as pd
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+# Debugging: See where we are
+print(f"Current File: {__file__}")
+print(f"Current Working Directory: {os.getcwd()}")
+
+# The path you are trying to add:
+target_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+print(f"Adding to sys.path: {target_path}")
+
+sys.path.append(target_path)
+
+# Verify if 'Project' is actually in that target_path
+if os.path.exists(os.path.join(target_path, 'Project')):
+    print("Success: 'Project' folder found in path!")
+else:
+    print("Error: 'Project' folder NOT found in that path.")
+
 from Project.Project.trading_card_generate_dataset import generate_dataset
+
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────
 st.set_page_config(page_title="Print Shop Simulator", layout="wide")
