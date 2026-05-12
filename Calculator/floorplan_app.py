@@ -68,11 +68,41 @@ st.markdown(f"""
 
     html, body, [class*="css"] {{ font-family: 'IBM Plex Sans', sans-serif; background-color: {C_DARK}; color: {C_WHITE}; }}
 
-    .kpi-block {{ background: {C_MID}; border-radius: 4px; padding: 1.2rem 1.5rem; border-left: 3px solid {C_ACCENT}; }}
+/* 3. KPI tiles - Centered & Tightened */
+    .kpi-block {{
+        background: {C_MID};
+        border-radius: 4px;
+        padding: 0.7rem 1rem;
+        border-left: 3px solid {C_ACCENT};
+        text-align: center;
+        min-height: 90px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }}
     .kpi-block.alert {{ border-left-color: {C_ALERT}; }}
-    .kpi-label {{ font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: {C_MUTED}; font-weight: 600; margin-bottom: 0.3rem; }}
-    .kpi-value {{ font-family: 'IBM Plex Mono', monospace; font-size: 2rem; font-weight: 600; line-height: 1; }}
-    .kpi-sub {{ font-size: 0.75rem; color: {C_MUTED}; margin-top: 0.3rem; }}
+    .kpi-block.ok {{ border-left-color: {C_OK}; }}
+    
+    .kpi-label {{
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: {C_MUTED};
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+    }}
+    .kpi-value {{
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 1.8rem;
+        font-weight: 600;
+        color: {C_WHITE};
+        line-height: 1.1;
+    }}
+    .kpi-sub {{
+        font-size: 0.75rem;
+        color: {C_MUTED};
+        margin-top: 0.2rem;
+    }}
 
     .section-label {{ font-size: 0.68rem; letter-spacing: 0.15em; text-transform: uppercase; color: {C_MUTED}; font-weight: 600; margin-bottom: 0.8rem; margin-top: 1.5rem; }}
 
@@ -97,13 +127,14 @@ st.markdown(f"""
 if "question" not in st.session_state: st.session_state.question = "forward"
 if "fwd_press" not in st.session_state: st.session_state.fwd_press = "All"
 if "fwd_cat" not in st.session_state: st.session_state.fwd_cat = "jams"
-if "fwd_pct" not in st.session_state: st.session_state.fwd_pct = 20
+if "fwd_pct" not in st.session_state: st.session_state.fwd_pct = 0
 if "target_pct" not in st.session_state: st.session_state.target_pct = 10
 if "plan_moves" not in st.session_state: st.session_state.plan_moves = []
 
 # ── HEADER ────────────────────────────────────────────────────────────────
 col_head, col_targ = st.columns([6, 1])
-
+fleet      = fleet_summary(DEFAULT_PRESS_CONFIG, DEFAULT_DOWNTIME_CONFIG)
+current    = fleet["total_reality"]
 with col_head:
     st.markdown(f"""
         <div style="font-size: 2rem; font-weight: 700; margin-bottom: 0rem; line-height: 1.2;">FloorPlan</div>
@@ -113,17 +144,47 @@ with col_head:
 with col_targ:
     st.markdown("<div style='margin-top:0.8rem;'></div>", unsafe_allow_html=True)
     with st.popover("+/- Target", use_container_width=True):
-        st.session_state.target_pct = st.number_input(
-            "Growth Goal (%)", min_value=1, max_value=100, 
-            value=int(st.session_state.target_pct), step=1, label_visibility="collapsed"
-        )
+
+        # Toggle mode
+        if "target_mode" not in st.session_state:
+            st.session_state.target_mode = "pct"
+
+        if st.session_state.target_mode == "pct":
+            st.number_input(
+                "Growth Goal (%)",
+                min_value=1,
+                max_value=200,
+                value=int(st.session_state.target_pct),
+                step=1,
+                format="%d",
+                label_visibility="collapsed",
+                key="target_pct",
+            )
+        else:
+            new_sheets = st.number_input(
+                "Target Sheets",
+                min_value=int(current * 1.01),
+                max_value=int(current * 3),
+                value=int(current * (1 + st.session_state.target_pct / 100)),
+                step=10000,
+                label_visibility="collapsed",
+                key="input_target_sheets",
+            )
+            # Convert sheets → pct so the rest of the app stays unchanged
+            st.session_state.target_pct = round((new_sheets / current - 1) * 100, 1)
+
+        # Toggle button
+        mode_label = "Switch to Sheets" if st.session_state.target_mode == "pct" else "Switch to %"
+        if st.button(mode_label, key="btn_target_mode", use_container_width=True):
+            st.session_state.target_mode = "sheets" if st.session_state.target_mode == "pct" else "pct"
+            st.rerun()
+
 
 # ── COMPUTE BASELINE (Only happens once here, after the input) ───────────
 TARGET_GROWTH_PCT = st.session_state.target_pct / 100
 ui_target_pct = st.session_state.target_pct
 
-fleet      = fleet_summary(DEFAULT_PRESS_CONFIG, DEFAULT_DOWNTIME_CONFIG)
-current    = fleet["total_reality"]
+
 target     = round(current * (1 + TARGET_GROWTH_PCT))
 gap        = target - current
 all_levers = rank_opportunities(DEFAULT_PRESS_CONFIG, DEFAULT_DOWNTIME_CONFIG, IMPROVEMENT_PCT)
@@ -135,19 +196,26 @@ with k1:
 with k2:
     st.markdown(f'<div class="kpi-block alert"><div class="kpi-label">Gap to Target</div><div class="kpi-value" style="color:{C_ALERT};">-{fmt_k(gap)}</div><div class="kpi-sub">+{ui_target_pct}% growth goal · target {fmt_k(target)}</div></div>', unsafe_allow_html=True)
 with k3:
-    if all_levers:
-        top = all_levers[0]
-        st.markdown(f'<div class="kpi-block"><div class="kpi-label">Biggest Opportunity</div><div class="kpi-value" style="font-size:1.1rem;padding-top:0.3rem;">{LEVER_LABELS.get(top["category"])}</div><div class="kpi-sub">Press {top["press"]} · +{fmt_k(top["sheets_gained"])} sheets at 20% reduction</div></div>', unsafe_allow_html=True)
+    goal_sheets = fmt_k(target)
+    goal_pct    = ui_target_pct
+    sheets_left = fmt_k(gap)
+    st.markdown(f"""
+    <div class="kpi-block">
+        <div class="kpi-label">Goal</div>
+        <div class="kpi-value">{goal_sheets}</div>
+        <div class="kpi-sub">+{goal_pct}% target · {sheets_left} to go</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
 # ── QUESTION BUTTONS ──────────────────────────────────────────────────────
-q1, q2, q3, q4, q5 = st.columns([4, 4, 4, 4, 2])
-if q1.button("📈 What if we improve?", key="btn_fwd"): st.session_state.question = "forward"; st.rerun()
-if q2.button("🎯 Path to target", key="btn_bwd"): st.session_state.question = "backward"; st.rerun()
-if q3.button("📊 Biggest losses", key="btn_loss"): st.session_state.question = "losses"; st.rerun()
-if q4.button("🔧 Build a plan", key="btn_plan"): st.session_state.question = "plan"; st.rerun()
-if q5.button("Reset", key="btn_reset"): 
+q1, q2, q3, q4, spacer, q5 = st.columns([3,3,3,3,6,2])
+if q1.button("📈 What if we improve?", key="btn_fwd",use_container_width=True): st.session_state.question = "forward"; st.rerun()
+if q2.button("🎯 Path to target", key="btn_bwd",use_container_width=True): st.session_state.question = "backward"; st.rerun()
+if q3.button("📊 Biggest losses", key="btn_loss",use_container_width=True): st.session_state.question = "losses"; st.rerun()
+if q4.button("🔧 Build a plan", key="btn_plan",use_container_width=True): st.session_state.question = "plan"; st.rerun()
+if q5.button("Reset", key="btn_reset",use_container_width=True): 
     st.session_state.question = "forward"; st.session_state.fwd_pct = 0
     st.session_state.plan_moves = []; st.rerun()
 
@@ -244,7 +312,7 @@ if st.session_state.question == "forward":
                 <div class="lever-name" style="font-size:1.1rem; margin-top:0.3rem;">{round(baseline_hrs, 1)} → {new_hrs} hrs/mo</div>
             </div>
             <div>
-                <div class="lever-gain" style="font-size:1.8rem;">-{fmt_hrs(hrs_used)}</div>
+                <div class="lever-gain" style="font-size:1.8rem;">{fmt_hrs(hrs_used)}</div>
                 <div class="lever-hrs">recovered</div>
             </div>
         </div>
@@ -254,8 +322,9 @@ if st.session_state.question == "forward":
     if hrs_used < hrs_saved:
         st.markdown(f"<div style='color:{C_MUTED};font-size:0.78rem;text-align:center;margin-top:1rem;'>⚠ {display_name} only has {fmt_hrs(hrs_used)} of headroom — {fmt_hrs(hrs_saved - hrs_used)} saved but at capacity.</div>", unsafe_allow_html=True)
 
-    progress_pct = min(gap_closed / 100, 1.0)
+    progress_pct   = min(gap_closed / 100, 1.0)
     bar_fill_color = C_OK if gap_closed >= 100 else C_ACCENT
+
     st.markdown(f"""
     <div style="margin-top:1.5rem;">
         <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:{C_MUTED};margin-bottom:0.4rem;text-align:center;">Progress to target</div>
@@ -267,6 +336,7 @@ if st.session_state.question == "forward":
         </div>
     </div>
     """, unsafe_allow_html=True)
+
 
 # ══════════════════════════════════════════════════════════════════════════
 # BACKWARD — What do we need to hit target?
@@ -479,6 +549,8 @@ elif st.session_state.question == "plan":
     new_total     = current + total_gained
     gap_closed    = round(total_gained / gap * 100, 1) if gap > 0 else 100
     
+
+    
 # ── PLAN SUMMARY BAR ───────────────────────────────
     bar_color   = C_OK if gap_closed >= 100 else C_ACCENT
     callout_cls = "result-callout success" if gap_closed >= 100 else "result-callout"
@@ -555,6 +627,9 @@ elif st.session_state.question == "plan":
 
     # ── MOVE LIST ─────────────────────────────────────────────────────────
     if results:
+        bar_colors = [C_OK, C_ACCENT, "#F59E0B", "#06B6D4", "#8B5CF6", "#EC4899", "#14B8A6"]
+        assigned_colors = [bar_colors[i % len(bar_colors)] for i, _ in enumerate(results)]
+
         st.markdown('<div class="section-label" style="margin-top:1.5rem; margin-bottom: 0.5rem;">Your plan</div>', unsafe_allow_html=True)
 
         cum_gained = 0
@@ -570,7 +645,8 @@ elif st.session_state.question == "plan":
             headroom_warn = r["hours_used"] < r["hours_saved"]
             
             width_pct = (r["sheets_gained"] / max_gain) * 100
-            bar_color = C_OK if ltype == "Process" else C_ACCENT
+            bar_color = assigned_colors[i]
+
             display_press = "Fleet Wide" if r['press'] == "All" else f"Press {r['press']}"
 
             col_bar, col_del = st.columns([15, 1])
@@ -597,63 +673,45 @@ elif st.session_state.question == "plan":
             st.session_state.plan_moves.pop(to_remove)
             st.rerun()
 
-        # ── WATERFALL ─────────────────────────────────────────────────────
-        st.markdown('<div class="section-label" style="margin-top:1.5rem;">Cumulative impact</div>', unsafe_allow_html=True)
+# ── STACKED PROGRESS BAR ──────────────────────────────────────────────
+    st.markdown(f"""
+    <div style="margin-top:1.5rem;">
+        <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;
+                    color:{C_MUTED};margin-bottom:0.4rem;text-align:center;">
+            Progress to target
+        </div>
+        <div style="background:{C_MID};border-radius:3px;height:14px;width:100%;display:flex;overflow:hidden;">
+            {"".join([
+                f'<div title="{LEVER_LABELS.get(r["category"])} · +{fmt_k(r["sheets_gained"])}" '
+                f'style="width:{min(r["sheets_gained"]/gap*100, 100):.2f}%;'
+                f'background:{assigned_colors[i]};'
+                f'height:100%;"></div>'
+                for i, r in enumerate(results)
+            ])}
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.72rem;
+                    color:{C_MUTED};margin-top:0.4rem;">
+            <span>{fmt_k(current)}</span>
+            <span style="color:{C_OK if gap_closed >= 100 else C_WHITE};">
+                {gap_closed:.0f}% closed
+            </span>
+            <span>Target: {fmt_k(target)}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.8rem;">
+            {"".join([
+                f'<div style="display:flex;align-items:center;gap:0.4rem;">'
+                f'<div style="width:10px;height:10px;border-radius:2px;'
+                f'background:{bar_colors[i % len(bar_colors)]};flex-shrink:0;"></div>'
+                f'<span style="font-size:0.72rem;color:{C_MUTED};">#{i+1} {r["press"]} · '
+                f'{LEVER_LABELS.get(r["category"])}</span></div>'
+                for i, r in enumerate(results)
+            ])}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-        wf_labels   = ["Now"]
-        wf_measures = ["absolute"]
-        wf_values   = [current]
-        wf_texts    = [fmt_k(current)]
-        
-        for i, r in enumerate(results):
-            label = LEVER_LABELS.get(r["category"], r["category"])
-            short_press = "Fleet" if r['press'] == "All" else r['press']
-            wf_labels.append(f"#{i+1} {short_press}<br>{label[:14]}")
-            wf_measures.append("relative")
-            wf_values.append(r["sheets_gained"])
-            wf_texts.append(f"+{fmt_k(r['sheets_gained'])}")
 
-        wf_labels.append("Target")
-        wf_measures.append("total")
-        wf_values.append(target)
-        wf_texts.append(fmt_k(target))
 
-        y_min = current * 0.97
-        y_max = max(target, new_total) * 1.02
-
-        target_color = C_OK if gap_closed >= 100 else C_ALERT
-
-        fig_wf = go.Figure(go.Waterfall(
-            orientation  = "v",
-            measure      = wf_measures,
-            x            = wf_labels,
-            y            = wf_values,
-            text         = wf_texts,
-            textposition = "outside",
-            textfont     = dict(family="IBM Plex Mono", size=12, color=C_WHITE),
-            connector    = dict(line=dict(color="#4B5563", width=1, dash="dot")),
-            increasing   = dict(marker_color=C_ACCENT),
-            decreasing   = dict(marker_color=C_ALERT),
-            totals       = dict(marker_color=target_color),
-        ))
-
-        fig_wf.add_hline(
-            y=target, line_width=2, line_dash="dash", line_color=C_WHITE,
-            annotation_text="TARGET", annotation_position="top right",
-            annotation_font=dict(color=C_WHITE, size=11),
-        )
-
-        fig_wf.update_layout(
-            height        = 300,
-            margin        = dict(l=0, r=20, t=40, b=0),
-            paper_bgcolor = "rgba(0,0,0,0)",
-            plot_bgcolor  = "rgba(0,0,0,0)",
-            showlegend    = False,
-            xaxis         = dict(showgrid=False, tickfont=dict(family="IBM Plex Sans", size=11, color=C_WHITE)),
-            yaxis         = dict(showgrid=True, gridcolor="#1F2937", range=[y_min, y_max], tickformat=",.0f", tickfont=dict(family="IBM Plex Mono", size=10, color=C_MUTED)),
-            waterfallgap  = 0.4,
-        )
-        st.plotly_chart(fig_wf, use_container_width=True, config={"displayModeBar": False})
 # ── FOOTER ────────────────────────────────────────────────────────────────
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(f"<div style='color:{C_MUTED};font-size:0.7rem;'>FloorPlan v1.0 · RRD Press Room · Calibrated Q1–Apr 2026 · Fleet accuracy -2.1% vs actual</div>", unsafe_allow_html=True)

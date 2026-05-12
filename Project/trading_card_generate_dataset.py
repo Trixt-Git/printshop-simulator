@@ -233,7 +233,7 @@ def generate_dataset(overrides=None):
 
     # ── BILLING BASIS ─────────────────────────────────────────────────────────
     # TODO: Confirm with estimating how passes affect billing.
-    # Current logic bills on qty_ordered * passes / bill_speed, meaning
+    # Current logic bills on qty_ordered * passes / bill_speed, meaning 
     # perfecting presses bill fewer impressions than sheetfed for the same order.
     # If billing is flat per job regardless of passes, this section needs rework.
 

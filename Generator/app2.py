@@ -420,8 +420,8 @@ if active == "default":
                      category_orders={"press": avg_margin.index.tolist()})
         
         fig2.update_layout(showlegend=False, xaxis_type="category",
-                          xaxis=dict(showgrid=False),
-                          yaxis=dict(gridcolor="#EEEEEE", ticksuffix="%"),
+                          xaxis=dict(showgrid=False,title=None),
+                          yaxis=dict(gridcolor="#EEEEEE", ticksuffix="%",title=None),
                           margin=dict(t=10, b=10))
         st.plotly_chart(fig2, use_container_width=True,height=350)
 
