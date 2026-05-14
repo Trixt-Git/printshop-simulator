@@ -52,7 +52,8 @@ DEFAULT_PRESS_CONFIG = {
         "quality":         0.981,
         "night_shift":     True,
         "days_scheduled":  24,
-        "makeready_mins_per_shift": 98,
+        "makeready_mins_per_shift": 170.9,
+        "target_makeready_mins_per_shift": 60
     },
     "2160": {
         "actual_run_hrs":  140.0,
@@ -63,6 +64,7 @@ DEFAULT_PRESS_CONFIG = {
         "night_shift":     True,
         "days_scheduled":  29,
         "makeready_mins_per_shift": 201,
+        "target_makeready_mins_per_shift": 60
     },
     "2150": {
         "actual_run_hrs":  160.5,
@@ -73,6 +75,7 @@ DEFAULT_PRESS_CONFIG = {
         "night_shift":     True,
         "days_scheduled":  26,
         "makeready_mins_per_shift": 74,
+        "target_makeready_mins_per_shift": 60
     },
     "2500": {
         "actual_run_hrs":  143.1,
@@ -82,7 +85,8 @@ DEFAULT_PRESS_CONFIG = {
         "quality":         0.954,
         "night_shift":     False,
         "days_scheduled":  35,
-        "makeready_mins_per_shift": 45,
+        "makeready_mins_per_shift": 131,
+        "target_makeready_mins_per_shift": 60
     },
     "2330": {
         "actual_run_hrs":   50.4,
@@ -92,7 +96,8 @@ DEFAULT_PRESS_CONFIG = {
         "quality":         0.951,
         "night_shift":     False,
         "days_scheduled":  22,
-        "makeready_mins_per_shift": 65,
+        "makeready_mins_per_shift": 77,
+        "target_makeready_mins_per_shift": 60
     },
     "2060": {
         "actual_run_hrs":   36.4,
@@ -102,7 +107,8 @@ DEFAULT_PRESS_CONFIG = {
         "quality":         0.889,
         "night_shift":     False,
         "days_scheduled":  28,
-        "makeready_mins_per_shift": 155,
+        "makeready_mins_per_shift": 143,
+        "target_makeready_mins_per_shift": 60
     },
 }
 
@@ -240,7 +246,8 @@ def lever_impact(press_id: str, category: str, reduction_pct: float,
         # Calculate makeready hours dynamically based on shifts
         shifts_per_day = 2 if cfg["night_shift"] else 1
         total_shifts = cfg["days_scheduled"] * shifts_per_day
-        hours_lost = total_shifts * (cfg["makeready_mins_per_shift"] / 60)
+        excess_mins = max(0, cfg["makeready_mins_per_shift"] - cfg["target_makeready_mins_per_shift"])
+        hours_lost = total_shifts * (excess_mins / 60)
     else:
         # Pull standard downtime from the dictionary
         hours_lost = downtime_config[press_id].get(category, 0)
@@ -271,12 +278,12 @@ def rank_opportunities(press_config: dict, downtime_config: dict,
     """Rank all levers by sheets gained at a given % reduction."""
     opportunities = []
     for press in press_config:
-        for category in downtime_config[press]:
-            if downtime_config[press][category] > 0:
-                impact = lever_impact(press, category, reduction_pct,
-                                      press_config, downtime_config)
-                if impact["sheets_gained"] > 0:
-                    opportunities.append(impact)
+        categories_to_check = list(downtime_config[press].keys())
+        categories_to_check.append("makeready")
+        for category in categories_to_check:
+            impact = lever_impact(press, category, reduction_pct, press_config, downtime_config)
+            if impact["sheets_gained"] > 0:
+                opportunities.append(impact)
     return sorted(opportunities, key=lambda x: x["sheets_gained"], reverse=True)
 
 
