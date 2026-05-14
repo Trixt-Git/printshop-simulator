@@ -31,9 +31,9 @@ from floorplan_calculator import (
 )
 
 # ── CONFIG ────────────────────────────────────────────────────────────────
-IMPROVEMENT_PCT   = 0.20
+IMPROVEMENT_PCT   = 1
 LEVER_LABELS = {
-    "maintenance": "Unplanned Maintenance", "jams": "Jams & Breakdowns",
+    "maintenance": "Unplanned Maintenance & Breakdowns", "jams": "Jams",
     "materials_wait": "Materials Wait", "shift_handoff": "Shift Handoff",
     "quality_approval": "Quality Wait", "manager_approval": "Approval Wait",
     "makeready": "Makeready / Setup",
@@ -124,7 +124,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── SESSION STATE (CLEANED) ───────────────────────────────────────────────
-if "question" not in st.session_state: st.session_state.question = "forward"
+if "question" not in st.session_state: st.session_state.question = "losses"
 if "fwd_press" not in st.session_state: st.session_state.fwd_press = "All"
 if "fwd_cat" not in st.session_state: st.session_state.fwd_cat = "jams"
 if "fwd_pct" not in st.session_state: st.session_state.fwd_pct = 0
@@ -211,14 +211,15 @@ st.markdown("<hr>", unsafe_allow_html=True)
 
 # ── QUESTION BUTTONS ──────────────────────────────────────────────────────
 q1, q2, q3, q4, spacer, q5 = st.columns([3,3,3,3,6,2])
-if q1.button("📈 What if we improve?", key="btn_fwd",use_container_width=True): st.session_state.question = "forward"; st.rerun()
+if q1.button("📊 Biggest losses", key="btn_loss",use_container_width=True): st.session_state.question = "losses"; st.rerun()
 if q2.button("🎯 Path to target", key="btn_bwd",use_container_width=True): st.session_state.question = "backward"; st.rerun()
-if q3.button("📊 Biggest losses", key="btn_loss",use_container_width=True): st.session_state.question = "losses"; st.rerun()
+if q3.button("📈 What if we improve?", key="btn_fwd",use_container_width=True): st.session_state.question = "forward"; st.rerun()
 if q4.button("🔧 Build a plan", key="btn_plan",use_container_width=True): st.session_state.question = "plan"; st.rerun()
 if q5.button("Reset", key="btn_reset",use_container_width=True): 
     st.session_state.question = "forward"; st.session_state.fwd_pct = 0
     st.session_state.plan_moves = []; st.rerun()
 
+#Order was switched, Losses is now default view.
 
 # ══════════════════════════════════════════════════════════════════════════
 # FORWARD — What if we improve something?
@@ -468,7 +469,7 @@ elif st.session_state.question == "losses":
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown('<div class="section-label" style="margin-top:0rem;">Historical Constraints — Top Fleet Losses (April)</div>', unsafe_allow_html=True)
 
-    top_n  = min(8, len(all_levers))
+    top_n  = min(10, len(all_levers))
     levers = all_levers[:top_n]
 
     bar_labels = [f"Press {l['press']} · {LEVER_LABELS.get(l['category'], l['category'])}" for l in levers]

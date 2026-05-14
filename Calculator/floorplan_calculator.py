@@ -114,18 +114,18 @@ DEFAULT_PRESS_CONFIG = {
 DEFAULT_DOWNTIME_CONFIG = {
     # Monthly averages: Q1 2026 (Jan-Mar) monthly avg + April 2026, averaged equally
     # Controllable downtime only (No Crew / idle excluded)
-    "2190": {"manager_approval":  5.2, "quality_approval":  9.2, "materials_wait":  1.6,
-             "shift_handoff": 17.0, "maintenance": 224.4, "jams": 56.4},
+    "2190": {"manager_approval":  1.5, "quality_approval":  2.7, "materials_wait":  1.5,
+             "shift_handoff": 17.0, "maintenance": 37.2, "jams": 45.6},
     "2160": {"manager_approval":  9.3, "quality_approval":  6.1, "materials_wait":  9.5,
-             "shift_handoff":  7.5, "maintenance": 115.4, "jams": 88.4},
+             "shift_handoff":  7.5, "maintenance": 34.9, "jams": 57.8},
     "2150": {"manager_approval":  1.8, "quality_approval":  9.7, "materials_wait": 27.8,
-             "shift_handoff":  3.8, "maintenance": 156.4, "jams": 104.4},
+             "shift_handoff":  3.8, "maintenance": 42.0, "jams": 71.5},
     "2500": {"manager_approval":  3.4, "quality_approval":  3.8, "materials_wait":  8.3,
-             "shift_handoff":  4.2, "maintenance": 125.0, "jams": 62.8},
+             "shift_handoff":  4.2, "maintenance": 18.8, "jams": 43.9},
     "2330": {"manager_approval":  0.4, "quality_approval":  0.8, "materials_wait":  5.2,
-             "shift_handoff":  2.7, "maintenance":  46.1, "jams": 32.2},
+             "shift_handoff":  2.7, "maintenance":  11.7, "jams": 23.1},
     "2060": {"manager_approval":  0.9, "quality_approval": 21.0, "materials_wait":  7.9,
-             "shift_handoff": 10.1, "maintenance": 127.6, "jams": 60.3},
+             "shift_handoff": 10.1, "maintenance": 30.1, "jams": 44.1},
 }
 
 # ── PLANNED MAINTENANCE (fixed input, not a lever) ────────────────────────
