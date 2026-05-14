@@ -31,7 +31,7 @@ from floorplan_calculator import (
 )
 
 # ── CONFIG ────────────────────────────────────────────────────────────────
-IMPROVEMENT_PCT   = 1
+IMPROVEMENT_PCT   = 0.2
 LEVER_LABELS = {
     "maintenance": "Unplanned Maintenance & Breakdowns", "jams": "Jams",
     "materials_wait": "Materials Wait", "shift_handoff": "Shift Handoff",
@@ -469,8 +469,9 @@ elif st.session_state.question == "losses":
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown('<div class="section-label" style="margin-top:0rem;">Historical Constraints — Top Fleet Losses (April)</div>', unsafe_allow_html=True)
 
-    top_n  = min(10, len(all_levers))
-    levers = all_levers[:top_n]
+    levers_full = rank_opportunities(DEFAULT_PRESS_CONFIG, DEFAULT_DOWNTIME_CONFIG, reduction_pct=1.0)
+    top_n  = min(10, len(levers_full))
+    levers = levers_full[:top_n]
 
     bar_labels = [f"Press {l['press']} · {LEVER_LABELS.get(l['category'], l['category'])}" for l in levers]
     bar_vals   = [l["sheets_gained"] for l in levers]
@@ -489,7 +490,7 @@ elif st.session_state.question == "losses":
         textposition="inside",
         insidetextanchor="start",  # Anchors text to the left side of the bar
         textfont=dict(family="IBM Plex Sans", size=13, color=C_WHITE),
-        hovertemplate="<b>%{y}</b><br>+%{x:,.0f} sheets at 20% reduction<br>Save %{customdata} hrs/month<extra></extra>",
+        hovertemplate="<b>%{y}</b><br>+%{x:,.0f} sheets (Total Potential Loss)<br>Total hours: %{customdata} hrs/month<extra></extra>",
         customdata=bar_hrs,
     ))
 
@@ -507,7 +508,7 @@ elif st.session_state.question == "losses":
     )
 
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-    st.markdown(f"<div style='color:{C_MUTED};font-size:0.72rem;margin-top:-0.5rem;text-align:center;'>Green = highest impact · assumes 20% reduction per lever · calibrated to real Apr 2026 data</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='color:{C_MUTED};font-size:0.72rem;margin-top:-0.5rem;text-align:center;'>Green = highest impact · shows 100% theoretical recovery · calibrated to real Apr 2026 data</div>", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════
 # PLAN — Build a cumulative improvement plan
