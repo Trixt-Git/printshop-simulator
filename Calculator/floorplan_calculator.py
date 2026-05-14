@@ -84,8 +84,8 @@ DEFAULT_PRESS_CONFIG = {
         "performance":     0.899,
         "quality":         0.954,
         "night_shift":     False,
-        "days_scheduled":  35,
-        "makeready_mins_per_shift": 131,
+        "days_scheduled":  28,
+        "makeready_mins_per_shift": 164,
         "target_makeready_mins_per_shift": 60
     },
     "2330": {

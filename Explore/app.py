@@ -2,36 +2,24 @@ import streamlit as st
 import sys
 import os
 
-# --- 1. DIRECTORY FIX ---
-# Path to app.py (.../Project/Explore)
-explore_dir = os.path.dirname(os.path.abspath(__file__))
+# --- IMPORT FIX ---
+# This looks one level up from "Explore" to the "Project" folder
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
 
-# Path to the Root Project folder (.../Project)
-project_root = os.path.dirname(explore_dir)
+# Import the logic and cleaner
+# Ensure floorplan_calculator.py and data_cleaner.py are in the Project folder
+from floorplan_calculator import DEFAULT_PRESS_CONFIG
+from data_cleaner import load_data
 
-# Path to the Calculator folder (.../Project/Calculator)
-calculator_dir = os.path.join(project_root, 'Calculator')
+st.set_page_config(layout="wide")
+st.title("Calibration: Makeready Metrics")
 
-# Add the Calculator folder to Python's search list
-if calculator_dir not in sys.path:
-    sys.path.append(calculator_dir)
-# Also add the Project root just in case data_cleaner is there
-if project_root not in sys.path:
-    sys.path.append(project_root)
-
-# --- 2. IMPORTS ---
-try:
-    from floorplan_calculator import DEFAULT_PRESS_CONFIG
-    from data_cleaner import load_data
-except ImportError as e:
-    st.error(f"Still can't find the files. Error: {e}")
-    st.stop()
-
-# --- 3. THE CALCULATION ---
-st.title("Makeready Calibration Report")
+# 1. Load the data
 df_clean = load_data()
 
-# Operations included in "Makeready"
+# 2. Define Makeready operations
 target_ops = [
     'Blanket Change', 
     'Make Ready', 
@@ -40,24 +28,30 @@ target_ops = [
     'Wash Plates/Blankets'
 ]
 
-# Filter and aggregate the total hours over the 4-month data period
+# 3. Filter for setup time only
 mr_data = df_clean[df_clean['Operation'].isin(target_ops)]
-# Divide by 4 to get the average monthly hours (Jan-Apr)
+
+# 4. Group by press and get Monthly Avg (Total / 4 months)
+# CSV covers Jan 1 - Apr 30
 mr_monthly_avg_hrs = mr_data.groupby('Machine')['Time_Hours'].sum() / 4
 
-# Loop through each press to calculate the shift ratio
+st.write("### Calculated Actuals (Mins per Shift)")
+st.write("Use these values to update your `DEFAULT_PRESS_CONFIG`.")
+
+# 5. Calculate Mins per Shift
 for machine_name, monthly_hrs in mr_monthly_avg_hrs.items():
-    # Extracts the ID like '2190' from names like '2190 KBA'
+    # Extract ID (e.g., '2190') from cleaned machine name
     press_id = str(machine_name).split()[0]
     
     if press_id in DEFAULT_PRESS_CONFIG:
         cfg = DEFAULT_PRESS_CONFIG[press_id]
         
-        # Calculate shifts per month from your configuration
-        shifts_per_day = 2 if cfg.get("night_shift", False) else 1
+        # Calculate scheduled shifts per month
+        shifts_per_day = 2 if cfg["night_shift"] else 1
         total_monthly_shifts = cfg["days_scheduled"] * shifts_per_day
         
-        # Math: (Avg Monthly Hours * 60 minutes) / Monthly Shifts
+        # Math: (Hours * 60 mins) / Total Shifts
         mins_per_shift = (monthly_hrs * 60) / total_monthly_shifts
         
-        st.write(f"**Press {press_id}:** {mins_per_shift:.1f} mins/shift")
+        st.metric(label=f"Press {press_id}", value=f"{mins_per_shift:.1f} mins/shift")
+        st.caption(f"Based on {monthly_hrs:.1f} avg monthly hours over {total_monthly_shifts} shifts.")
