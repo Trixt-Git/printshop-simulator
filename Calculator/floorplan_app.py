@@ -47,6 +47,15 @@ LEVER_TYPE = {
     "speed":"Process",
 
 }
+DOWNTIME_CODE_MAP = {
+    "maintenance": ["401 (Mech)", "402 (Elec)", "410 (Software)"],
+    "jams": ["501 (Feeder)", "502 (Delivery)", "505 (Transfer)"],
+    "materials_wait": ["201 (Ink)", "301 (Paper)"],
+    "shift_handoff": ["901 (Shift Change)", "902 (Cleanup)"],
+    "quality_approval": ["601 (Color)", "605 (Reg)"],
+    "manager_approval": ["701 (Approval Wait)"],
+    "makeready": ["101 (Plates)", "102 (Washup)"]
+}
 
 C_DARK, C_MID, C_MUTED, C_WHITE = "#111827", "#374151", "#6B7280", "#FFFFFF"
 C_ACCENT, C_ALERT, C_OK = "#2563EB", "#DC2626", "#16A34A"
@@ -244,130 +253,130 @@ st.markdown("<hr>", unsafe_allow_html=True)
 q1, q2, q3, q4, spacer, q5 = st.columns([3,3,3,3,6,2])
 if q1.button("📊 Biggest losses", key="btn_loss",use_container_width=True): st.session_state.question = "losses"; st.rerun()
 if q2.button("🎯 Path to target", key="btn_bwd",use_container_width=True): st.session_state.question = "backward"; st.rerun()
-if q3.button("📈 What if we improve?", key="btn_fwd",use_container_width=True): st.session_state.question = "forward"; st.rerun()
-if q4.button("🔧 Build a plan", key="btn_plan",use_container_width=True): st.session_state.question = "plan"; st.rerun()
+if q3.button("🔧 Build a plan", key="btn_plan",use_container_width=True): st.session_state.question = "plan"; st.rerun()
+if q4.button("Deep Dive 🔍", use_container_width=True): st.session_state.question = "deep_dive";st.rerun()
 if q5.button("Reset", key="btn_reset",use_container_width=True): 
     st.session_state.question = "forward"; st.session_state.fwd_pct = 0
     st.session_state.plan_moves = []; st.rerun()
 
 #Order was switched, Losses is now default view.
 
-# ══════════════════════════════════════════════════════════════════════════
-# FORWARD — What if we improve something?
-# ══════════════════════════════════════════════════════════════════════════
-if st.session_state.question == "forward":
-    st.markdown("<hr>", unsafe_allow_html=True)
+# # ══════════════════════════════════════════════════════════════════════════
+# # FORWARD — What if we improve something?
+# # ══════════════════════════════════════════════════════════════════════════
+# if st.session_state.question == "forward":
+#     st.markdown("<hr>", unsafe_allow_html=True)
     
-    # 1. Inputs across the top
-    col_press, col_cat, col_pct = st.columns(3)
+#     # 1. Inputs across the top
+#     col_press, col_cat, col_pct = st.columns(3)
 
-    with col_press:
-        press_options = ["All"] + list(st.session_state.press_config.keys())
-        press = st.selectbox(
-            "Press",
-            options=press_options,
-            index=press_options.index(st.session_state.fwd_press) if st.session_state.fwd_press in press_options else 0,
-            key="sel_press",
-        )
-        st.session_state.fwd_press = press
+#     with col_press:
+#         press_options = ["All"] + list(st.session_state.press_config.keys())
+#         press = st.selectbox(
+#             "Press",
+#             options=press_options,
+#             index=press_options.index(st.session_state.fwd_press) if st.session_state.fwd_press in press_options else 0,
+#             key="sel_press",
+#         )
+#         st.session_state.fwd_press = press
 
-    with col_cat:
-        cat = st.selectbox(
-            "What are you improving?",
-            options=list(LEVER_LABELS.keys()),
-            format_func=lambda x: LEVER_LABELS[x],
-            index=list(LEVER_LABELS.keys()).index(st.session_state.fwd_cat),
-            key="sel_cat",
-        )
-        st.session_state.fwd_cat = cat
+#     with col_cat:
+#         cat = st.selectbox(
+#             "What are you improving?",
+#             options=list(LEVER_LABELS.keys()),
+#             format_func=lambda x: LEVER_LABELS[x],
+#             index=list(LEVER_LABELS.keys()).index(st.session_state.fwd_cat),
+#             key="sel_cat",
+#         )
+#         st.session_state.fwd_cat = cat
 
-    with col_pct:
-        pct = st.slider(
-            "By how much?",
-            min_value=0,
-            max_value=100,
-            value=st.session_state.fwd_pct,
-            step=5,
-            format="%d%%",
-            key="sl_pct",
-        )
-        st.session_state.fwd_pct = pct
+#     with col_pct:
+#         pct = st.slider(
+#             "By how much?",
+#             min_value=0,
+#             max_value=100,
+#             value=st.session_state.fwd_pct,
+#             step=5,
+#             format="%d%%",
+#             key="sl_pct",
+#         )
+#         st.session_state.fwd_pct = pct
 
-    st.markdown("<div style='margin-bottom:1.5rem;'></div>", unsafe_allow_html=True)
+#     st.markdown("<div style='margin-bottom:1.5rem;'></div>", unsafe_allow_html=True)
 
-    # 2. Results underneath
-    gained       = 0
-    hrs_saved    = 0
-    hrs_used     = 0
-    baseline_hrs = 0
+#     # 2. Results underneath
+#     gained       = 0
+#     hrs_saved    = 0
+#     hrs_used     = 0
+#     baseline_hrs = 0
     
-    presses_to_calc = list(st.session_state.press_config.keys()) if press == "All" else [press]
+#     presses_to_calc = list(st.session_state.press_config.keys()) if press == "All" else [press]
     
-    for p in presses_to_calc:
-        result = lever_impact(p, cat, pct / 100, st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG)
-        gained    += result["sheets_gained"]
-        hrs_saved += result["hours_saved"]
-        hrs_used  += result["hours_used"]
+#     for p in presses_to_calc:
+#         result = lever_impact(p, cat, pct / 100, st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG)
+#         gained    += result["sheets_gained"]
+#         hrs_saved += result["hours_saved"]
+#         hrs_used  += result["hours_used"]
         
-        if cat == "makeready":
-            cfg = st.session_state.press_config[p]
-            shifts_per_day = 2 if cfg["night_shift"] else 1
-            total_shifts = cfg["days_scheduled"] * shifts_per_day
-            baseline_hrs += round(total_shifts * (cfg["makeready_mins_per_shift"] / 60), 1)
-        else:
-            baseline_hrs += DEFAULT_DOWNTIME_CONFIG[p].get(cat, 0)
+#         if cat == "makeready":
+#             cfg = st.session_state.press_config[p]
+#             shifts_per_day = 2 if cfg["night_shift"] else 1
+#             total_shifts = cfg["days_scheduled"] * shifts_per_day
+#             baseline_hrs += round(total_shifts * (cfg["makeready_mins_per_shift"] / 60), 1)
+#         else:
+#             baseline_hrs += DEFAULT_DOWNTIME_CONFIG[p].get(cat, 0)
             
-    new_hrs      = round(baseline_hrs - hrs_used, 1)
-    gap_closed   = round(gained / gap * 100, 1) if gap > 0 else 100
-    new_total    = current + gained
+#     new_hrs      = round(baseline_hrs - hrs_used, 1)
+#     gap_closed   = round(gained / gap * 100, 1) if gap > 0 else 100
+#     new_total    = current + gained
     
-    display_name = "Fleet Wide" if press == "All" else f"Press {press}"
-    callout_class = "result-callout success" if gap_closed >= 100 else "result-callout"
+#     display_name = "Fleet Wide" if press == "All" else f"Press {press}"
+#     callout_class = "result-callout success" if gap_closed >= 100 else "result-callout"
     
-    # Place the boxes side-by-side
-    col_res_left, col_res_right = st.columns(2)
+#     # Place the boxes side-by-side
+#     col_res_left, col_res_right = st.columns(2)
     
-    with col_res_left:
-        st.markdown(f"""
-        <div class="{callout_class}" style="margin-bottom:0; height:100%; display:flex; flex-direction:column; justify-content:center;">
-            <div style="font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:{C_MUTED};margin-bottom:0.4rem;">Sheets gained</div>
-            <div style="font-family:'IBM Plex Mono',monospace;font-size:2.2rem;font-weight:700;color:{C_OK};">+{fmt_k(gained)}</div>
-            <div style="font-size:0.85rem;color:{C_MUTED};margin-top:0.3rem;">New fleet total: {fmt_k(new_total)} &nbsp;·&nbsp; Gap closed: {gap_closed:.0f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
+#     with col_res_left:
+#         st.markdown(f"""
+#         <div class="{callout_class}" style="margin-bottom:0; height:100%; display:flex; flex-direction:column; justify-content:center;">
+#             <div style="font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:{C_MUTED};margin-bottom:0.4rem;">Sheets gained</div>
+#             <div style="font-family:'IBM Plex Mono',monospace;font-size:2.2rem;font-weight:700;color:{C_OK};">+{fmt_k(gained)}</div>
+#             <div style="font-size:0.85rem;color:{C_MUTED};margin-top:0.3rem;">New fleet total: {fmt_k(new_total)} &nbsp;·&nbsp; Gap closed: {gap_closed:.0f}%</div>
+#         </div>
+#         """, unsafe_allow_html=True)
 
-    with col_res_right:
-        st.markdown(f"""
-        <div class="lever-card" style="margin-bottom:0; height:100%;">
-            <div>
-                <div class="lever-press">{display_name} · {LEVER_LABELS[cat]}</div>
-                <div class="lever-name" style="font-size:1.1rem; margin-top:0.3rem;">{round(baseline_hrs, 1)} → {new_hrs} hrs/mo</div>
-            </div>
-            <div>
-                <div class="lever-gain" style="font-size:1.8rem;">{fmt_hrs(hrs_used)}</div>
-                <div class="lever-hrs">recovered</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+#     with col_res_right:
+#         st.markdown(f"""
+#         <div class="lever-card" style="margin-bottom:0; height:100%;">
+#             <div>
+#                 <div class="lever-press">{display_name} · {LEVER_LABELS[cat]}</div>
+#                 <div class="lever-name" style="font-size:1.1rem; margin-top:0.3rem;">{round(baseline_hrs, 1)} → {new_hrs} hrs/mo</div>
+#             </div>
+#             <div>
+#                 <div class="lever-gain" style="font-size:1.8rem;">{fmt_hrs(hrs_used)}</div>
+#                 <div class="lever-hrs">recovered</div>
+#             </div>
+#         </div>
+#         """, unsafe_allow_html=True)
 
-    # Warnings and progress bar span the full width underneath
-    if hrs_used < hrs_saved:
-        st.markdown(f"<div style='color:{C_MUTED};font-size:0.78rem;text-align:center;margin-top:1rem;'>⚠ {display_name} only has {fmt_hrs(hrs_used)} of hours_lost — {fmt_hrs(hrs_saved - hrs_used)} saved but at capacity.</div>", unsafe_allow_html=True)
+#     # Warnings and progress bar span the full width underneath
+#     if hrs_used < hrs_saved:
+#         st.markdown(f"<div style='color:{C_MUTED};font-size:0.78rem;text-align:center;margin-top:1rem;'>⚠ {display_name} only has {fmt_hrs(hrs_used)} of hours_lost — {fmt_hrs(hrs_saved - hrs_used)} saved but at capacity.</div>", unsafe_allow_html=True)
 
-    progress_pct   = min(gap_closed / 100, 1.0)
-    bar_fill_color = C_OK if gap_closed >= 100 else C_ACCENT
+#     progress_pct   = min(gap_closed / 100, 1.0)
+#     bar_fill_color = C_OK if gap_closed >= 100 else C_ACCENT
 
-    st.markdown(f"""
-    <div style="margin-top:1.5rem;">
-        <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:{C_MUTED};margin-bottom:0.4rem;text-align:center;">Progress to target</div>
-        <div style="background:{C_MID};border-radius:3px;height:10px;width:100%;">
-            <div style="background:{bar_fill_color};border-radius:3px;height:10px;width:{progress_pct*100:.0f}%;"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:{C_MUTED};margin-top:0.4rem;">
-            <span>{fmt_k(current)}</span><span>Target: {fmt_k(target)}</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+#     st.markdown(f"""
+#     <div style="margin-top:1.5rem;">
+#         <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:{C_MUTED};margin-bottom:0.4rem;text-align:center;">Progress to target</div>
+#         <div style="background:{C_MID};border-radius:3px;height:10px;width:100%;">
+#             <div style="background:{bar_fill_color};border-radius:3px;height:10px;width:{progress_pct*100:.0f}%;"></div>
+#         </div>
+#         <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:{C_MUTED};margin-top:0.4rem;">
+#             <span>{fmt_k(current)}</span><span>Target: {fmt_k(target)}</span>
+#         </div>
+#     </div>
+#     """, unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -890,7 +899,102 @@ elif st.session_state.question == "plan":
             st.session_state.plan_moves.pop(to_remove)
             st.rerun()
 
+# ══════════════════════════════════════════════════════════════════════════
+# DEEP DIVE — Code-Level Detailed Audit
+# ══════════════════════════════════════════════════════════════════════════
+elif st.session_state.question == "deep_dive":
+    if "dd_filter_press" not in st.session_state:
+        st.session_state.dd_filter_press = "All"
 
+    st.markdown("<hr>", unsafe_allow_html=True)
+    
+    # ── 1. COMPACT PRESS FILTER BAR ──────────────────────────────────────
+    press_list = list(st.session_state.press_config.keys())
+    filter_options = ["All"] + press_list
+    cols = st.columns(len(filter_options))
+    
+    for i, opt in enumerate(filter_options):
+        label = f"[{opt}]" if st.session_state.dd_filter_press == opt else str(opt)
+        if cols[i].button(label, key=f"dd_filter_{opt}", use_container_width=True):
+            st.session_state.dd_filter_press = opt
+            st.rerun()
+
+    # ── 2. CODE-SPECIFIC DATA TABLE (FILTERED) ───────────────────────────
+    st.markdown('<div class="section-label" style="margin-top:1.5rem; margin-bottom:1rem;">Full Audit: Press & Code Breakdown</div>', unsafe_allow_html=True)
+    
+    raw_levers = rank_opportunities(st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, reduction_pct=1.0)
+    
+    df_rows = []
+    active_press = st.session_state.dd_filter_press
+    levers_to_render = [l for l in raw_levers if active_press == "All" or l["press"] == active_press]
+
+    for l in levers_to_render:
+        if l["category"] == "speed": continue
+        
+        specific_codes = DOWNTIME_CODE_MAP.get(l["category"], [LEVER_LABELS.get(l["category"], l["category"])])
+        num_codes = len(specific_codes)
+        
+        p_cfg = st.session_state.press_config[l["press"]]
+        n_s = p_cfg["days_scheduled"] * (2 if p_cfg["night_shift"] else 1)
+        
+        for code_desc in specific_codes:
+            code_sheets = l["sheets_gained"] / num_codes
+            code_hours = l["hours_saved"] / num_codes
+            code_mps = (code_hours * 60) / n_s if n_s > 0 else 0
+            
+            df_rows.append({
+                "Press": f"Press {l['press']}",
+                "Reason": code_desc,
+                "Overall": LEVER_LABELS.get(l["category"], l["category"]),
+                "Sheets Lost": int(code_sheets),
+                "Hours Lost": code_hours,
+                "Mins/Shift": int(code_mps)
+            })
+
+    df_rows.sort(key=lambda x: x["Sheets Lost"], reverse=True)
+
+    st.dataframe(
+        df_rows,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Press": st.column_config.TextColumn("Press", width="small"),
+            "Reason": st.column_config.TextColumn("Specific Code / Reason", width="large"),
+            "Overall": st.column_config.TextColumn("Overall Category", width="medium"),
+            "Sheets Lost": st.column_config.ProgressColumn(
+                "Sheet Loss",
+                format="%d",
+                min_value=0,
+                max_value=max([r["Sheets Lost"] for r in df_rows]) if df_rows else 1,
+            ),
+            "Hours Lost": st.column_config.NumberColumn("Hrs/Mo", format="%.1f"),
+            "Mins/Shift": st.column_config.NumberColumn("Impact", format="%d min"),
+        }
+    )
+
+    # ── 3. CODE MAPPING GRID (REFERENCE CARDS) ───────────────────────────
+    st.markdown('<div class="section-label" style="margin-top:2.5rem; margin-bottom: 0.8rem;">Downtime Reason Code Reference</div>', unsafe_allow_html=True)
+    
+    map_cols = st.columns(3)
+    for i, (cat_key, codes) in enumerate(DOWNTIME_CODE_MAP.items()):
+        with map_cols[i % 3]:
+            st.markdown(f"""
+                <div style="background:{C_MID}; padding:0.8rem; border-radius:4px; border-left:3px solid {C_ACCENT}; margin-bottom:0.8rem; min-height:85px;">
+                    <div style="font-size:0.65rem; color:{C_MUTED}; text-transform:uppercase; letter-spacing:0.1em; font-weight:700;">{LEVER_LABELS.get(cat_key, cat_key)}</div>
+                    <div style="font-family:'IBM Plex Mono', monospace; font-size:0.82rem; color:{C_WHITE}; margin-top:0.4rem; line-height:1.4;">
+                        {", ".join(codes)}
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+        <div style="background:#1e293b; border:1px solid #334155; border-radius:4px; padding:0.75rem; margin-top:1.5rem; display:flex; align-items:center; gap:12px;">
+            <span style="font-size:1.2rem;">🔍</span>
+            <span style="color:{C_MUTED}; font-size:0.82rem; line-height:1.4;">
+                <b>Active Filter:</b> Showing data for <b>{active_press}</b>. Use the glossary above to see which machine codes feed into the high-level categories.
+            </span>
+        </div>
+    """, unsafe_allow_html=True)
 # ── FOOTER ────────────────────────────────────────────────────────────────
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(f"<div style='color:{C_MUTED};font-size:0.7rem;'>FloorPlan v1.0 · RRD Press Room · Calibrated Q1–Apr 2026 · Fleet accuracy -2.1% vs actual</div>", unsafe_allow_html=True)
