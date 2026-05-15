@@ -662,25 +662,24 @@ elif st.session_state.question == "losses":
 elif st.session_state.question == "plan":
     st.markdown("<hr>", unsafe_allow_html=True)
 
-    # ── CALCULATE CUMULATIVE IMPACT (Moved up for preview math) ───────────
+    # ── 1. CUMULATIVE IMPACT CALCULATION ─────────────────────────────────
     claimed = {}
     results = []
 
     for move in st.session_state.plan_moves:
-        presses_to_calc = list(st.session_state.press_config.keys()) if move["press"] == "All" else [move["press"]]
-        
+        p_list = list(st.session_state.press_config.keys()) if move["press"] == "All" else [move["press"]]
         m_gain, m_used, m_saved = 0, 0, 0
         
-        for p in presses_to_calc:
+        for p in p_list:
             already = claimed.get(p, 0)
-            impact  = lever_impact(
+            impact = lever_impact(
                 p, move["category"], move["pct"] / 100,
                 st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG,
-                hours_already_claimed=already,
+                hours_already_claimed=already
             )
             claimed[p] = already + impact["hours_used"]
-            m_gain  += impact["sheets_gained"]
-            m_used  += impact["hours_used"]
+            m_gain += impact["sheets_gained"]
+            m_used += impact["hours_used"]
             m_saved += impact["hours_saved"]
             
         results.append({
@@ -692,15 +691,13 @@ elif st.session_state.question == "plan":
             "hours_saved": m_saved
         })
 
-    total_gained  = sum(r["sheets_gained"] for r in results)
-    total_hrs     = sum(r["hours_used"]    for r in results)
-    new_total     = current + total_gained
-    gap_closed    = round(total_gained / gap * 100, 1) if gap > 0 else 100
+    total_gained = sum(r["sheets_gained"] for r in results)
+    total_hrs = sum(r["hours_used"] for r in results)
+    new_total = current + total_gained
+    gap_closed = round(total_gained / gap * 100, 1) if gap > 0 else 100
     
-
-    
-# ── PLAN SUMMARY BAR ───────────────────────────────
-    bar_color   = C_OK if gap_closed >= 100 else C_ACCENT
+    # ── 2. PLAN SUMMARY CALLOUT ──────────────────────────────────────────
+    bar_color = C_OK if gap_closed >= 100 else C_ACCENT
     callout_cls = "result-callout success" if gap_closed >= 100 else "result-callout"
     
     st.markdown(f"""
@@ -715,7 +712,7 @@ elif st.session_state.question == "plan":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── INPUT ROW ─────────────────────────────────────────────────────────
+    # ── 3. INPUT ROW ─────────────────────────────────────────────────────
     col_p, col_c, col_pct, col_prev, col_add = st.columns([1.5, 2.5, 1.5, 2.5, 1.2])
 
     with col_p:
@@ -723,143 +720,78 @@ elif st.session_state.question == "plan":
         add_press = st.selectbox("Press", options=press_options, key="plan_press")
 
     with col_c:
-        add_cat = st.selectbox(
-            "What to improve",
-            options=list(LEVER_LABELS.keys()),
-            format_func=lambda x: LEVER_LABELS[x],
-            key="plan_cat",
-        )
+        add_cat = st.selectbox("What to improve", options=list(LEVER_LABELS.keys()), format_func=lambda x: LEVER_LABELS[x], key="plan_cat")
 
     with col_pct:
         add_pct = st.slider("By how much?", 0, 100, 0, step=5, format="%d%%", key="plan_pct")
 
-    # ── PREVIEW CALCULATION ───────────────────────────────────────────────
-    presses_to_calc_prev = list(st.session_state.press_config.keys()) if add_press == "All" else [add_press]
+    # Preview Calc
+    p_list_prev = list(st.session_state.press_config.keys()) if add_press == "All" else [add_press]
     p_gain, p_hrs, p_save = 0, 0, 0
-    
-    for p in presses_to_calc_prev:
-        preview_already = claimed.get(p, 0)
-        preview_impact = lever_impact(
-            p, add_cat, add_pct / 100,
-            st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG,
-            hours_already_claimed=preview_already
-        )
-        p_gain += preview_impact["sheets_gained"]
-        p_hrs  += preview_impact["hours_used"]
-        p_save += preview_impact["hours_saved"]
+    for p in p_list_prev:
+        p_gain += lever_impact(p, add_cat, add_pct/100, st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, hours_already_claimed=claimed.get(p, 0))["sheets_gained"]
+        p_hrs  += lever_impact(p, add_cat, add_pct/100, st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, hours_already_claimed=claimed.get(p, 0))["hours_used"]
+        p_save += lever_impact(p, add_cat, add_pct/100, st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, hours_already_claimed=claimed.get(p, 0))["hours_saved"]
     
     with col_prev:
-        warn_msg = f"<span style='color:{C_ALERT}; font-size:0.85rem; margin-left:0.4rem;' title='Clipped (only {fmt_hrs(p_hrs)} left)'>⚠</span>" if p_hrs < p_save else ""
-        
-        st.markdown(f"""
-        <div style="margin-top:1.73rem; background:{C_MID}; border:1px solid #4B5563; border-radius:4px; padding:0.65rem 0.5rem; display:flex; justify-content:center; align-items:center; line-height:1.2;">
-            <span style="font-size:0.85rem; color:{C_MUTED}; text-transform:uppercase; letter-spacing:0.05em; margin-right:0.6rem;">Sheets:</span>
-            <span style="font-family:'IBM Plex Mono',monospace; color:{C_OK}; font-size:1.05rem; font-weight:700;">+{fmt_k(p_gain)}</span>
-            {warn_msg}
-        </div>
-        """, unsafe_allow_html=True)
+        warn_msg = f"<span style='color:{C_ALERT}; font-size:0.85rem; margin-left:0.4rem;' title='Clipped'>⚠</span>" if p_hrs < p_save and add_cat != "speed" else ""
+        st.markdown(f'<div style="margin-top:1.73rem; background:{C_MID}; border:1px solid #4B5563; border-radius:4px; padding:0.65rem 0.5rem; display:flex; justify-content:center; align-items:center; line-height:1.2;"><span style="font-size:0.85rem; color:{C_MUTED}; text-transform:uppercase; letter-spacing:0.05em; margin-right:0.6rem;">Sheets:</span><span style="font-family:\'IBM Plex Mono\',monospace; color:{C_OK}; font-size:1.05rem; font-weight:700;">+{fmt_k(p_gain)}</span>{warn_msg}</div>', unsafe_allow_html=True)
 
     with col_add:
         st.markdown("<div style='margin-top:1.73rem;'></div>", unsafe_allow_html=True)
         if st.button("＋ Add", key="btn_add_move", use_container_width=True):
-            st.session_state.plan_moves.append({
-                "press": add_press,
-                "category": add_cat,
-                "pct": add_pct,
-            })
+            st.session_state.plan_moves.append({"press": add_press, "category": add_cat, "pct": add_pct})
             st.rerun()
 
-
-    st.markdown("<div style='margin-bottom:1.5rem;'></div>", unsafe_allow_html=True)
-
-    # ── THE MASTER STACKED BAR ──────────────────────────────────────────
+    # ── 4. THE MASTER STACKED BAR ────────────────────────────────────────
     st.markdown('<div class="section-label" style="margin-top:1.5rem; margin-bottom: 0.5rem;">Visualized Plan Growth</div>', unsafe_allow_html=True)
+    bar_colors_list = [C_OK, C_ACCENT, "#F59E0B", "#06B6D4", "#8B5CF6", "#EC4899", "#14B8A6"]
     
-    bar_colors = [C_OK, C_ACCENT, "#F59E0B", "#06B6D4", "#8B5CF6", "#EC4899", "#14B8A6"]
-    
-# 1. Build Committed Slices
     committed_slices_html = ""
     for i, r in enumerate(results):
         w = (r["sheets_gained"] / gap * 100) if gap > 0 else 0
         label = LEVER_LABELS.get(r["category"], r["category"])
         display_press = "Fleet Wide" if r['press'] == "All" else f"Press {r['press']}"
+        bg_color = bar_colors_list[i % len(bar_colors_list)]
         
-        # Calc MPS for tooltip and inner text
-        p_list = list(st.session_state.press_config.keys()) if r['press'] == "All" else [r['press']]
-        b_hrs, b_shifts = 0, 0
-        for p_id in p_list:
-            p_cfg = st.session_state.press_config[p_id]
-            n_s = p_cfg["days_scheduled"] * (2 if p_cfg["night_shift"] else 1)
-            b_shifts += n_s
-            b_hrs += n_s * (p_cfg["makeready_mins_per_shift"] / 60) if r["category"] == "makeready" else DEFAULT_DOWNTIME_CONFIG[p_id].get(r["category"], 0)
-        
-        m_curr = (b_hrs * 60) / b_shifts if b_shifts > 0 else 0
-        m_targ = ((b_hrs - r["hours_used"]) * 60) / b_shifts if b_shifts > 0 else 0
-        mps_str = f"{int(m_curr)}min —> {int(m_targ)}min"
-        
-        full_info = f"{display_press} | {label} | +{fmt_k(r['sheets_gained'])} sheets | {mps_str}"
-        bg_color = bar_colors[i % len(bar_colors)]
-        
-        # --- STEPPED TRUNCATION LOGIC ---
-        # Create a shorter press label for tight spaces (e.g. "P1" instead of "Press 1")
+        # MATH FOR TOOLTIP (Handles Speed vs Downtime)
+        p_ids = list(st.session_state.press_config.keys()) if r['press'] == "All" else [r['press']]
+        if r["category"] == "speed":
+            avg_iph = sum(st.session_state.press_config[p]["effective_sph"] for p in p_ids) / len(p_ids)
+            new_iph = avg_iph * (1 + r["pct"]/100)
+            detail_str = f"{int(avg_iph):,} -> {int(new_iph):,} IPH"
+        else:
+            b_hrs, b_shifts = 0, 0
+            for p in p_ids:
+                p_cfg = st.session_state.press_config[p]
+                n_s = p_cfg["days_scheduled"] * (2 if p_cfg["night_shift"] else 1)
+                b_shifts += n_s
+                b_hrs += n_s * (p_cfg["makeready_mins_per_shift"] / 60) if r["category"] == "makeready" else DEFAULT_DOWNTIME_CONFIG[p].get(r["category"], 0)
+            m_curr = (b_hrs * 60) / b_shifts if b_shifts > 0 else 0
+            m_targ = ((b_hrs - r["hours_used"]) * 60) / b_shifts if b_shifts > 0 else 0
+            detail_str = f"{int(m_curr)}m -> {int(m_targ)}m per shift"
+
+        full_info = f"{display_press} | {label} | +{fmt_k(r['sheets_gained'])} | {detail_str}"
         short_press = "All" if r['press'] == "All" else f"P{r['press']}"
         
-        if w >= 25:
-            # Full detail
-            inner_text = f'<span style="padding-left:0.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{display_press} · {label} &nbsp;&nbsp;<b>+{fmt_k(r["sheets_gained"])}</b> &nbsp;&nbsp;<span style="opacity:0.7; font-size:0.8rem;">({mps_str})</span></span>'
-        elif w >= 12:
-            # Medium detail: Press + Math
-            inner_text = f'<span style="padding-left:0.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{display_press} &nbsp;&nbsp;<b>+{fmt_k(r["sheets_gained"])}</b></span>'
-        elif w >= 5:
-            # Low detail: Short Press + Math
-            inner_text = f'<span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{short_press} <b>+{fmt_k(r["sheets_gained"])}</b></span>'
-        else:
-            # Micro bar: Hide text, rely on hover
-            inner_text = ""
+        # Stepped Truncation Logic
+        if w >= 25: inner_text = f'<span style="padding-left:0.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{display_press} · {label} &nbsp;&nbsp;<b>+{fmt_k(r["sheets_gained"])}</b></span>'
+        elif w >= 12: inner_text = f'<span style="padding-left:0.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{display_press} &nbsp;&nbsp;<b>+{fmt_k(r["sheets_gained"])}</b></span>'
+        elif w >= 5: inner_text = f'<span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{short_press} <b>+{fmt_k(r["sheets_gained"])}</b></span>'
+        else: inner_text = ""
         
         committed_slices_html += f'<div title="{full_info}" style="width:{w}%; background:{bg_color}; height:100%; display:flex; align-items:center; justify-content:center; border-right:1px solid {C_DARK}; overflow:hidden; font-size:0.85rem; color:white;">{inner_text}</div>'
 
-    # 2. Build Ghost Slice
+    # Ghost Slice (Preview)
     ghost_html = ""
-    preview_gap_closed = gap_closed
-    
     if add_pct > 0:
         g_w = (p_gain / gap * 100) if gap > 0 else 0
-        g_color = bar_colors[len(results) % len(bar_colors)]
-        g_label = LEVER_LABELS.get(add_cat, add_cat)
-        preview_gap_closed = round((total_gained + p_gain) / gap * 100, 1) if gap > 0 else 100
-        
-        pre_press = "Fleet Wide" if add_press == "All" else f"Press {add_press}"
-        ghost_info = f"PREVIEW: {pre_press} | {g_label} | +{fmt_k(p_gain)} sheets"
-        
-        # --- STEPPED TRUNCATION LOGIC ---
-        short_pre_press = "All" if add_press == "All" else f"{add_press}"
-        
-        if g_w >= 25:
-            inner_ghost = f'<span style="padding-left:0.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{pre_press} · {g_label} &nbsp;&nbsp;<b>+{fmt_k(p_gain)}</b></span>'
-        elif g_w >= 12:
-            inner_ghost = f'<span style="padding-left:0.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{pre_press} &nbsp;&nbsp;<b>+{fmt_k(p_gain)}</b></span>'
-        elif g_w >= 5:
-            inner_ghost = f'<span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{short_pre_press} <b>+{fmt_k(p_gain)}</b></span>'
-        else:
-            inner_ghost = ""
-            
-        ghost_html = f'<div title="{ghost_info}" style="width:{g_w}%; background:{g_color}; opacity:0.6; height:100%; display:flex; align-items:center; justify-content:center; border: 1px dashed white; overflow:hidden; font-size:0.85rem; color:white;">{inner_ghost}</div>'
-    # 3. Render the combined Master Bar
-    master_bar_wrapper = f"""
-<div style="background:{C_MID}; border-radius:6px; height:50px; width:100%; display:flex; overflow:hidden; border:2px solid {C_MID}; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);">
-{committed_slices_html}{ghost_html}
-</div>
-<div style="display:flex; justify-content:space-between; font-size:0.75rem; color:{C_MUTED}; margin-top:0.4rem; padding:0 2px;">
-<span>Current: {fmt_k(current)}</span>
-<span style="color:{C_WHITE}; font-weight:600;">{preview_gap_closed:.0f}% of Gap Closed {"(Preview)" if add_pct > 0 else ""}</span>
-<span>Target: {fmt_k(target)}</span>
-</div>
-"""
+        g_color = bar_colors_list[len(results) % len(bar_colors_list)]
+        ghost_html = f'<div style="width:{g_w}%; background:{g_color}; opacity:0.6; height:100%; border: 1px dashed white;"></div>'
 
-    st.markdown(master_bar_wrapper, unsafe_allow_html=True)
+    st.markdown(f'<div style="background:{C_MID}; border-radius:6px; height:50px; width:100%; display:flex; overflow:hidden; border:2px solid {C_MID};">{committed_slices_html}{ghost_html}</div>', unsafe_allow_html=True)
 
-    # ── THE SMALLER MANAGEMENT LIST ──────────────────────────────────────
+    # ── 5. ACTIVE LEVERS LIST ────────────────────────────────────────────
     if results:
         st.markdown('<div class="section-label" style="margin-top:1.5rem; margin-bottom: 0.5rem;">Active Levers</div>', unsafe_allow_html=True)
         to_remove = None
@@ -867,33 +799,29 @@ elif st.session_state.question == "plan":
             label = LEVER_LABELS.get(r["category"], r["category"])
             display_press = "Fleet Wide" if r['press'] == "All" else f"Press {r['press']}"
             
-            # Restore the MPS math for the list view
-            p_list = list(st.session_state.press_config.keys()) if r['press'] == "All" else [r['press']]
-            b_hrs, b_shifts = 0, 0
-            for p_id in p_list:
-                p_cfg = st.session_state.press_config[p_id]
-                n_s = p_cfg["days_scheduled"] * (2 if p_cfg["night_shift"] else 1)
-                b_shifts += n_s
-                b_hrs += n_s * (p_cfg["makeready_mins_per_shift"] / 60) if r["category"] == "makeready" else DEFAULT_DOWNTIME_CONFIG[p_id].get(r["category"], 0)
-            
-            m_curr = (b_hrs * 60) / b_shifts if b_shifts > 0 else 0
-            m_targ = ((b_hrs - r["hours_used"]) * 60) / b_shifts if b_shifts > 0 else 0
-            mps_str = f"{int(m_curr)}min —> {int(m_targ)}min"
+            # Special Metric for Speed in List
+            if r["category"] == "speed":
+                p_ids = list(st.session_state.press_config.keys()) if r['press'] == "All" else [r['press']]
+                avg_iph = sum(st.session_state.press_config[p]["effective_sph"] for p in p_ids) / len(p_ids)
+                new_iph = avg_iph * (1 + r["pct"]/100)
+                metric_str = f"{int(avg_iph):,} -> {int(new_iph):,} IPH"
+            else:
+                p_ids = list(st.session_state.press_config.keys()) if r['press'] == "All" else [r['press']]
+                b_hrs, b_shifts = 0, 0
+                for p in p_ids:
+                    p_cfg = st.session_state.press_config[p]
+                    n_s = p_cfg["days_scheduled"] * (2 if p_cfg["night_shift"] else 1)
+                    b_shifts += n_s
+                    b_hrs += n_s * (p_cfg["makeready_mins_per_shift"] / 60) if r["category"] == "makeready" else DEFAULT_DOWNTIME_CONFIG[p].get(r["category"], 0)
+                m_curr = (b_hrs * 60) / b_shifts if b_shifts > 0 else 0
+                m_targ = ((b_hrs - r["hours_used"]) * 60) / b_shifts if b_shifts > 0 else 0
+                metric_str = f"{int(m_curr)}m -> {int(m_targ)}m"
 
             col_txt, col_del = st.columns([15, 1])
             with col_txt:
-                st.markdown(f"""
-                <div style="font-size:0.85rem; color:{C_MUTED}; display:flex; align-items:center; gap:10px; padding-top:0.3rem;">
-                    <div style="width:10px; height:10px; background:{bar_colors[i % len(bar_colors)]}; border-radius:2px;"></div>
-                    <span style="color:{C_WHITE}; font-weight:600;">{display_press}</span> 
-                    <span>{label}</span>
-                    <span style="margin-left:auto; font-family:'IBM Plex Mono'; color:{C_OK}; font-weight:600;">+{fmt_k(r['sheets_gained'])}</span>
-                    <span style="opacity:0.7; font-size:0.8rem; margin-left:10px;">({mps_str})</span>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div style="font-size:0.85rem; color:{C_MUTED}; display:flex; align-items:center; gap:10px; padding-top:0.3rem;"><div style="width:10px; height:10px; background:{bar_colors_list[i % len(bar_colors_list)]}; border-radius:2px;"></div><span style="color:{C_WHITE}; font-weight:600;">{display_press}</span><span>{label}</span><span style="margin-left:auto; font-family:\'IBM Plex Mono\'; color:{C_OK}; font-weight:600;">+{fmt_k(r["sheets_gained"])}</span><span style="opacity:0.7; font-size:0.8rem; margin-left:10px;">({metric_str})</span></div>', unsafe_allow_html=True)
             with col_del:
-                if st.button("✕", key=f"del_{i}", help="Remove from plan"):
-                    to_remove = i
+                if st.button("✕", key=f"del_{i}"): to_remove = i
         
         if to_remove is not None:
             st.session_state.plan_moves.pop(to_remove)
