@@ -167,7 +167,7 @@ def ceiling_sheets(cfg: dict, planned_maintenance: float = 0) -> int:
     Reduced by planned maintenance (fixed, not a lever).
     """
     avail = available_hours(cfg) - planned_maintenance
-    return round(avail * cfg["cruising_sph"] * cfg["performance"] * cfg["quality"])
+    return round(avail * cfg["effective_sph"] * cfg["performance"] * cfg["quality"])
 
 
 def oee_actual(cfg: dict) -> dict:
@@ -236,42 +236,66 @@ def lever_impact(press_id: str, category: str, reduction_pct: float,
                  press_config: dict, downtime_config: dict, hours_already_claimed=0) -> dict:
     """
     What sheets are gained if we reduce one downtime category by reduction_pct?
-    Hours recovered × effective_sph = sheets gained.
-    Capped at available hours - actual run hours (can't exceed ceiling).
+    Or, what sheets are gained if we increase run speed by reduction_pct?
     """
     cfg = press_config[press_id]
+    avail = available_hours(cfg)
     
-    # --- DYNAMIC ROUTING FIX ---
-    if category == "makeready":
-        # Calculate makeready hours dynamically based on shifts
+    # 1. SPEED LEVER: Increases yield of existing run hours, does not recover lost time.
+    if category == "speed":
+        hours_saved = 0
+        hours_used = 0 
+        sheets_gained = round(cfg["actual_run_hrs"] * (cfg["effective_sph"] * reduction_pct))
+        
+        # OEE Math: Speed increases the Performance multiplier directly, scaling the whole OEE.
+        if avail > 0:
+            base_oee= (cfg["actual_run_hrs"] / avail) * cfg["performance"] * cfg["quality"]
+            oee_gained = round(base_oee * reduction_pct * 100, 2)
+        else:
+            oee_gained = 0
+            
+        lever_type = "process"
+        
+    # 2. MAKEREADY LEVER: Recovers time based on a realistic dynamic floor.
+    elif category == "makeready":
         shifts_per_day = 2 if cfg["night_shift"] else 1
         total_shifts = cfg["days_scheduled"] * shifts_per_day
         excess_mins = max(0, cfg["makeready_mins_per_shift"] - cfg["target_makeready_mins_per_shift"])
         hours_lost = total_shifts * (excess_mins / 60)
+        
+        hours_saved = round(hours_lost * reduction_pct, 1)
+        lost_time = avail - cfg["actual_run_hrs"] - hours_already_claimed
+        hours_used = min(hours_saved, lost_time)
+        sheets_gained = round(hours_used * cfg["effective_sph"])
+        
+        # OEE Math: Recovered hours increase Availability.
+        oee_gained = round((hours_used / avail) * cfg["performance"] * cfg["quality"] * 100, 2) if avail > 0 else 0
+        lever_type = "process"
+        
+    # 3. STANDARD DOWNTIME LEVERS: Recovers hours directly from the config dictionary.
     else:
-        # Pull standard downtime from the dictionary
         hours_lost = downtime_config[press_id].get(category, 0)
-    # ---------------------------
-
-    hours_saved  = round(hours_lost * reduction_pct, 1)
-
-    # Cap recovered hours at what's actually available above current run time
-    headroom     = available_hours(cfg) - cfg["actual_run_hrs"] - hours_already_claimed
-    hours_used   = min(hours_saved, headroom)
-
-    sheets_gained = round(hours_used * cfg["effective_sph"])
+        hours_saved = round(hours_lost * reduction_pct, 1)
+        lost_time = avail - cfg["actual_run_hrs"] - hours_already_claimed
+        hours_used = min(hours_saved, lost_time)
+        sheets_gained = round(hours_used * cfg["effective_sph"])
+        
+        # OEE Math: Recovered hours increase Availability.
+        oee_gained = round((hours_used / avail) * cfg["performance"] * cfg["quality"] * 100, 2) if avail > 0 else 0
+        
+        process_cats = ["manager_approval", "quality_approval", "materials_wait", "shift_handoff"]
+        lever_type = "process" if category in process_cats else "mechanical"
 
     return {
         "press":          press_id,
         "category":       category,
-        "type":           "process" if category in ["manager_approval","quality_approval","materials_wait","shift_handoff","makeready"] else "mechanical",
+        "type":           lever_type,
         "reduction_pct":  reduction_pct,
         "hours_saved":    hours_saved,
         "hours_used":     hours_used,
         "sheets_gained":  sheets_gained,
-        "oee_pts_gained": round(hours_used / available_hours(cfg) * cfg["performance"] * cfg["quality"] * 100, 2) if available_hours(cfg) > 0 else 0,
+        "oee_pts_gained": oee_gained,
     }
-
 
 def rank_opportunities(press_config: dict, downtime_config: dict,
                        reduction_pct: float = 0.20) -> list:

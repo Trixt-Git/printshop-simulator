@@ -11,7 +11,7 @@ Requires floorplan_calculator.py in the same directory.
 
 import streamlit as st
 import plotly.graph_objects as go
-import sys, os
+import sys, os, copy
 
 # ── DOCS (Assigned to variable so it doesn't render as a gap) ─────────────
 _docs = """
@@ -37,12 +37,15 @@ LEVER_LABELS = {
     "materials_wait": "Materials Wait", "shift_handoff": "Shift Handoff",
     "quality_approval": "Quality Wait", "manager_approval": "Approval Wait",
     "makeready": "Makeready / Setup",
+    "speed":"Running Speed Increase",
 }
 LEVER_TYPE = {
     "maintenance": "Mechanical", "jams": "Mechanical",
     "materials_wait": "Process", "shift_handoff": "Process",
     "quality_approval": "Process", "manager_approval": "Process",
     "makeready": "Process",
+    "speed":"Process",
+
 }
 
 C_DARK, C_MID, C_MUTED, C_WHITE = "#111827", "#374151", "#6B7280", "#FFFFFF"
@@ -131,9 +134,33 @@ if "fwd_pct" not in st.session_state: st.session_state.fwd_pct = 0
 if "target_pct" not in st.session_state: st.session_state.target_pct = 10
 if "plan_moves" not in st.session_state: st.session_state.plan_moves = []
 
+# press_config lives in session state so settings panel edits flow into all calculations.
+# It starts as a deep copy of the defaults — user changes never touch the source of truth.
+if "press_config" not in st.session_state:
+    st.session_state.press_config = copy.deepcopy(DEFAULT_PRESS_CONFIG)
+
+# ── HELPER: MINUTES PER SHIFT ─────────────────────────────────────────────
+def mins_per_shift(hours: float, cfg: dict) -> float:
+    """Convert total monthly hours to average minutes lost per shift.
+
+    Learning note: we compute total_shifts from the config rather than
+    accepting it as a parameter — keeps the function self-contained and
+    avoids the caller needing to know the shift math.
+    """
+    shifts_per_day = 2 if cfg["night_shift"] else 1
+    total_shifts = cfg["days_scheduled"] * shifts_per_day
+    if total_shifts == 0:
+        return 0.0
+    return round((hours * 60) / total_shifts, 1)
+
+def fmt_mps(hours: float, cfg: dict) -> str:
+    """Format mins-per-shift as a short readable string."""
+    mps = mins_per_shift(hours, cfg)
+    return f"{mps:.0f} min/shift"
+
 # ── HEADER ────────────────────────────────────────────────────────────────
 col_head, col_targ = st.columns([6, 1])
-fleet      = fleet_summary(DEFAULT_PRESS_CONFIG, DEFAULT_DOWNTIME_CONFIG)
+fleet      = fleet_summary(st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG)
 current    = fleet["total_reality"]
 with col_head:
     st.markdown(f"""
@@ -187,7 +214,7 @@ ui_target_pct = st.session_state.target_pct
 
 target     = round(current * (1 + TARGET_GROWTH_PCT))
 gap        = target - current
-all_levers = rank_opportunities(DEFAULT_PRESS_CONFIG, DEFAULT_DOWNTIME_CONFIG, IMPROVEMENT_PCT)
+all_levers = rank_opportunities(st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, IMPROVEMENT_PCT)
 
 # ── KPI STRIP ─────────────────────────────────────────────────────────────
 k1, k2, k3 = st.columns(3)
@@ -208,6 +235,8 @@ with k3:
     """, unsafe_allow_html=True)
 
 st.markdown("<hr>", unsafe_allow_html=True)
+
+
 
 # ── QUESTION BUTTONS ──────────────────────────────────────────────────────
 q1, q2, q3, q4, spacer, q5 = st.columns([3,3,3,3,6,2])
@@ -231,7 +260,7 @@ if st.session_state.question == "forward":
     col_press, col_cat, col_pct = st.columns(3)
 
     with col_press:
-        press_options = ["All"] + list(DEFAULT_PRESS_CONFIG.keys())
+        press_options = ["All"] + list(st.session_state.press_config.keys())
         press = st.selectbox(
             "Press",
             options=press_options,
@@ -270,16 +299,16 @@ if st.session_state.question == "forward":
     hrs_used     = 0
     baseline_hrs = 0
     
-    presses_to_calc = list(DEFAULT_PRESS_CONFIG.keys()) if press == "All" else [press]
+    presses_to_calc = list(st.session_state.press_config.keys()) if press == "All" else [press]
     
     for p in presses_to_calc:
-        result = lever_impact(p, cat, pct / 100, DEFAULT_PRESS_CONFIG, DEFAULT_DOWNTIME_CONFIG)
+        result = lever_impact(p, cat, pct / 100, st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG)
         gained    += result["sheets_gained"]
         hrs_saved += result["hours_saved"]
         hrs_used  += result["hours_used"]
         
         if cat == "makeready":
-            cfg = DEFAULT_PRESS_CONFIG[p]
+            cfg = st.session_state.press_config[p]
             shifts_per_day = 2 if cfg["night_shift"] else 1
             total_shifts = cfg["days_scheduled"] * shifts_per_day
             baseline_hrs += round(total_shifts * (cfg["makeready_mins_per_shift"] / 60), 1)
@@ -321,7 +350,7 @@ if st.session_state.question == "forward":
 
     # Warnings and progress bar span the full width underneath
     if hrs_used < hrs_saved:
-        st.markdown(f"<div style='color:{C_MUTED};font-size:0.78rem;text-align:center;margin-top:1rem;'>⚠ {display_name} only has {fmt_hrs(hrs_used)} of headroom — {fmt_hrs(hrs_saved - hrs_used)} saved but at capacity.</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='color:{C_MUTED};font-size:0.78rem;text-align:center;margin-top:1rem;'>⚠ {display_name} only has {fmt_hrs(hrs_used)} of hours_lost — {fmt_hrs(hrs_saved - hrs_used)} saved but at capacity.</div>", unsafe_allow_html=True)
 
     progress_pct   = min(gap_closed / 100, 1.0)
     bar_fill_color = C_OK if gap_closed >= 100 else C_ACCENT
@@ -345,7 +374,7 @@ if st.session_state.question == "forward":
 elif st.session_state.question == "backward":
     st.markdown("<hr>", unsafe_allow_html=True)
 
-    plan = what_would_it_take(target, DEFAULT_PRESS_CONFIG, DEFAULT_DOWNTIME_CONFIG, IMPROVEMENT_PCT)
+    plan = what_would_it_take(target, st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, IMPROVEMENT_PCT)
 
     _, col_status, _ = st.columns([1, 4, 1])
 
@@ -359,9 +388,10 @@ elif st.session_state.question == "backward":
         cum_closed += lev["pct_of_gap"]
         label      = LEVER_LABELS.get(lev["category"], lev["category"])
         ltype      = LEVER_TYPE.get(lev["category"], "")
+        p_cfg      = st.session_state.press_config[lev["press"]]
         
         if lev["category"] == "makeready":
-            cfg = DEFAULT_PRESS_CONFIG[lev["press"]]
+            cfg = p_cfg
             shifts_per_day = 2 if cfg["night_shift"] else 1
             total_shifts = cfg["days_scheduled"] * shifts_per_day
             baseline = round(total_shifts * (cfg["makeready_mins_per_shift"] / 60), 1)
@@ -369,25 +399,33 @@ elif st.session_state.question == "backward":
             baseline = DEFAULT_DOWNTIME_CONFIG[lev["press"]].get(lev["category"], 0)
             
         target_hrs = round(baseline - lev["hours_saved"], 1)
+        mps_str    = fmt_mps(baseline, p_cfg)
         is_top     = (i == 0)
         card_class = "lever-card top" if is_top else "lever-card"
 
-        # "Deal" the cards left and right using modulo
-        with card_cols[i % 2]:
-            st.markdown(f"""
-            <div class="{card_class}">
-                <div>
-                    <div class="lever-press">#{i+1} · Press {lev['press']} · {ltype}</div>
-                    <div class="lever-name">{label}</div>
-                    <div style="font-size:0.78rem;color:{C_MUTED};margin-top:0.2rem;">{baseline} → {target_hrs} hrs/month &nbsp;(save {lev['hours_saved']} hrs)</div>
-                </div>
-                <div style="text-align:right;min-width:90px;">
-                    <div class="lever-gain">+{fmt_k(lev['sheets_gained'])}</div>
-                    <div class="lever-hrs">closes {lev['pct_of_gap']:.0f}% of gap</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+# Convert the decimal (0.2) to a clean integer (20)
+        reduction_display = int(lev['reduction_pct'] * 100)
 
+        hrs = lev.get('hours_saved', 0)
+
+        with card_cols[i % 2]:
+            card_html = (
+                f'<div class="{card_class}" style="padding: 1rem; border-radius: 0.5rem; background: #1E293B; border: 1px solid #334155; border-left: 4px solid {C_ACCENT}; margin-bottom: 0.75rem;">'
+                f'<div style="font-size: 0.8rem; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">Step {i+1}</div>'
+                f'<div style="font-size: 1.1rem; font-weight: 600; color: #F8FAFC; margin-bottom: 0.75rem;">{lev["press"]} {label}</div>'
+                
+                f'<div style="background: rgba(0,0,0,0.25); padding: 0.75rem; border-radius: 0.25rem; margin-bottom: 0.75rem; border: 1px solid #0F172A;">'
+                f'<div style="font-size: 0.95rem; color: #E2E8F0; margin-bottom: 0.3rem;"><b>Target:</b> Recover {hrs} hours</div>'
+                f'<div style="font-size: 0.85rem; color: #9CA3AF;"><b>Action:</b> Reduce occurrences by {reduction_display}%</div>'
+                f'</div>'
+                
+                f'<div style="display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 600; color: {C_ACCENT};">'
+                f'<div>+{fmt_k(lev["closes_sheets"])} Sheets</div>'
+                f'<div>{lev.get("pct_of_gap", 0):.0f}% of Gap</div>'
+                f'</div>'
+                f'</div>'
+            )
+            st.markdown(card_html, unsafe_allow_html=True)
     # ── WATERFALL CHART ──────────────────────────────────────────────────
     if plan["levers"]:
         st.markdown('<div class="section-label" style="margin-top:1.5rem;">Projected Target Build-Up</div>', unsafe_allow_html=True)
@@ -395,7 +433,9 @@ elif st.session_state.question == "backward":
         labels   = ["Now"]
         measures = ["absolute"]
         values   = [current]
-        texts    = [fmt_k(current)]
+        texts    = [f"Now<br><b>{fmt_k(current)} sheets</b>"]
+        positions = ["inside"]
+
 
         for i, lev in enumerate(plan["levers"]):
             label     = LEVER_LABELS.get(lev["category"], lev["category"])
@@ -403,20 +443,23 @@ elif st.session_state.question == "backward":
             labels.append(short)
             measures.append("relative")
             values.append(lev["closes_sheets"])
-            texts.append(f"+{fmt_k(lev['closes_sheets'])}")
+            texts.append(f"{short}<br><b>+{fmt_k(lev['closes_sheets'])}</b>")
+            positions.append("auto")
 
         if not plan["fully_closeable"] and plan["gap_remaining"] > 0:
             labels.append("Shortfall")
             measures.append("relative")
             values.append(plan["gap_remaining"])
             texts.append(f"-{fmt_k(plan['gap_remaining'])}")
+            positions.append("auto")
 
         labels.append("Target")
         measures.append("total")
         values.append(target)
-        texts.append(fmt_k(target))
+        texts.append(f"Target<br><b>{fmt_k(target)}</b>")
+        positions.append("inside")
 
-        y_min = current * 0.97
+        y_min = current * .97
         y_max = target  * 1.02
 
         fig_wf = go.Figure(go.Waterfall(
@@ -425,40 +468,27 @@ elif st.session_state.question == "backward":
             x           = labels,
             y           = values,
             text        = texts,
-            textposition= "outside",
-            textfont    = dict(family="IBM Plex Mono", size=12, color=C_WHITE),
+            textposition= positions,
+            textfont    = dict(family="IBM Plex Sans", size=11, color=C_WHITE),
             connector   = dict(line=dict(color="#4B5563", width=1, dash="dot")),
             increasing  = dict(marker_color=C_ACCENT),
             decreasing  = dict(marker_color=C_ALERT),
             totals      = dict(marker_color=C_MID),
         ))
 
-        fig_wf.add_hline(
-            y=target,
-            line_width=2, line_dash="dash", line_color=C_WHITE,
-            annotation_text="TARGET",
-            annotation_position="top right",
-            annotation_font=dict(color=C_WHITE, size=11),
-        )
 
         fig_wf.update_layout(
-            height          = 300,
+            height          = 350,
             margin          = dict(l=0, r=20, t=40, b=0),
             paper_bgcolor   = "rgba(0,0,0,0)",
             plot_bgcolor    = "rgba(0,0,0,0)",
             showlegend      = False,
-            xaxis           = dict(
-                showgrid    = False,
-                tickfont    = dict(family="IBM Plex Sans", size=11, color=C_WHITE),
-            ),
+            xaxis           = dict(visible=False),
             yaxis           = dict(
-                showgrid    = True,
-                gridcolor   = "#1F2937",
+                visible     = False,  
                 range       = [y_min, y_max],
-                tickformat  = ",.0f",
-                tickfont    = dict(family="IBM Plex Mono", size=10, color=C_MUTED),
             ),
-            waterfallgap    = 0.4,
+            waterfallgap    = 0.3,
         )
 
         st.plotly_chart(fig_wf, use_container_width=True, config={"displayModeBar": False})
@@ -469,7 +499,8 @@ elif st.session_state.question == "losses":
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown('<div class="section-label" style="margin-top:0rem;">Historical Constraints — Top Fleet Losses (April)</div>', unsafe_allow_html=True)
 
-    levers_full = rank_opportunities(DEFAULT_PRESS_CONFIG, DEFAULT_DOWNTIME_CONFIG, reduction_pct=1.0)
+    levers_raw = rank_opportunities(st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, reduction_pct=1.0)
+    levers_full = [l for l in levers_raw if l["category"] != "speed"]
     top_n  = min(10, len(levers_full))
     levers = levers_full[:top_n]
 
@@ -477,6 +508,13 @@ elif st.session_state.question == "losses":
     bar_vals   = [l["sheets_gained"] for l in levers]
     bar_hrs    = [l["hours_saved"] for l in levers]
     bar_colors = [C_OK if i == 0 else C_ACCENT if i <= 2 else C_MID for i in range(top_n)]
+
+    # Build mins-per-shift for hover tooltip — gives the floor manager a shift-level feel
+    # for what each loss category actually costs. "71.5 hrs/month" is abstract;
+    # "27 min/shift" is something you feel every day.
+    # TO BE ADDED: once job count data is available, add jobs-per-shift as a second
+    # translation layer (e.g., "that's ~3 jobs per shift lost to jams").
+    bar_mps = [fmt_mps(l["hours_saved"], st.session_state.press_config[l["press"]]) for l in levers]
     
     # Combine the title and the value into one string for the inside of the bar
     bar_text   = [f"  Press {l['press']} · {LEVER_LABELS.get(l['category'], l['category'])}    (+{fmt_k(v)})" for l, v in zip(levers, bar_vals)]
@@ -490,8 +528,8 @@ elif st.session_state.question == "losses":
         textposition="inside",
         insidetextanchor="start",  # Anchors text to the left side of the bar
         textfont=dict(family="IBM Plex Sans", size=13, color=C_WHITE),
-        hovertemplate="<b>%{y}</b><br>+%{x:,.0f} sheets (Total Potential Loss)<br>Total hours: %{customdata} hrs/month<extra></extra>",
-        customdata=bar_hrs,
+        hovertemplate="<b>%{y}</b><br>+%{x:,.0f} sheets (100% recovery)<br>%{customdata[0]} hrs/month · <b>%{customdata[1]}</b><extra></extra>",
+        customdata=list(zip(bar_hrs, bar_mps)),
     ))
 
     fig.update_layout(
@@ -508,7 +546,7 @@ elif st.session_state.question == "losses":
     )
 
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-    st.markdown(f"<div style='color:{C_MUTED};font-size:0.72rem;margin-top:-0.5rem;text-align:center;'>Green = highest impact · shows 100% theoretical recovery · calibrated to real Apr 2026 data</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='color:{C_MUTED};font-size:0.72rem;margin-top:-0.5rem;text-align:center;'>Green = highest impact · shows 100% theoretical recovery · hover for hrs/month and min/shift · calibrated to real Apr 2026 data</div>", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════
 # PLAN — Build a cumulative improvement plan
@@ -521,7 +559,7 @@ elif st.session_state.question == "plan":
     results = []
 
     for move in st.session_state.plan_moves:
-        presses_to_calc = list(DEFAULT_PRESS_CONFIG.keys()) if move["press"] == "All" else [move["press"]]
+        presses_to_calc = list(st.session_state.press_config.keys()) if move["press"] == "All" else [move["press"]]
         
         m_gain, m_used, m_saved = 0, 0, 0
         
@@ -529,7 +567,7 @@ elif st.session_state.question == "plan":
             already = claimed.get(p, 0)
             impact  = lever_impact(
                 p, move["category"], move["pct"] / 100,
-                DEFAULT_PRESS_CONFIG, DEFAULT_DOWNTIME_CONFIG,
+                st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG,
                 hours_already_claimed=already,
             )
             claimed[p] = already + impact["hours_used"]
@@ -573,7 +611,7 @@ elif st.session_state.question == "plan":
     col_p, col_c, col_pct, col_prev, col_add = st.columns([1.5, 2.5, 1.5, 2.5, 1.2])
 
     with col_p:
-        press_options = ["All"] + list(DEFAULT_PRESS_CONFIG.keys())
+        press_options = ["All"] + list(st.session_state.press_config.keys())
         add_press = st.selectbox("Press", options=press_options, key="plan_press")
 
     with col_c:
@@ -588,14 +626,14 @@ elif st.session_state.question == "plan":
         add_pct = st.slider("By how much?", 0, 100, 0, step=5, format="%d%%", key="plan_pct")
 
     # ── PREVIEW CALCULATION ───────────────────────────────────────────────
-    presses_to_calc_prev = list(DEFAULT_PRESS_CONFIG.keys()) if add_press == "All" else [add_press]
+    presses_to_calc_prev = list(st.session_state.press_config.keys()) if add_press == "All" else [add_press]
     p_gain, p_hrs, p_save = 0, 0, 0
     
     for p in presses_to_calc_prev:
         preview_already = claimed.get(p, 0)
         preview_impact = lever_impact(
             p, add_cat, add_pct / 100,
-            DEFAULT_PRESS_CONFIG, DEFAULT_DOWNTIME_CONFIG,
+            st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG,
             hours_already_claimed=preview_already
         )
         p_gain += preview_impact["sheets_gained"]
@@ -644,7 +682,7 @@ elif st.session_state.question == "plan":
             cum_pct      = round(cum_gained / gap * 100, 1) if gap > 0 else 100
             label        = LEVER_LABELS.get(r["category"], r["category"])
             ltype        = LEVER_TYPE.get(r["category"], "Process")
-            headroom_warn = r["hours_used"] < r["hours_saved"]
+            hours_lost_warn = r["hours_used"] < r["hours_saved"]
             
             width_pct = (r["sheets_gained"] / max_gain) * 100
             bar_color = assigned_colors[i]
@@ -654,7 +692,7 @@ elif st.session_state.question == "plan":
             col_bar, col_del = st.columns([15, 1])
             with col_bar:
                 warn_html = ""
-                if headroom_warn:
+                if hours_lost_warn:
                     clipped = r["hours_saved"] - r["hours_used"]
                     warn_html = f"<span style='color:{C_ALERT}; margin-left:1rem; font-size:0.75rem;'>⚠ {fmt_hrs(clipped)} clipped</span>"
                 
