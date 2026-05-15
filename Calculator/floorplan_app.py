@@ -33,7 +33,7 @@ from floorplan_calculator import (
 # ── CONFIG ────────────────────────────────────────────────────────────────
 IMPROVEMENT_PCT   = 0.2
 LEVER_LABELS = {
-    "maintenance": "Unplanned Maintenance & Breakdowns", "jams": "Jams",
+    "maintenance": "Unplanned Maint. & Breakdowns", "jams": "Jams",
     "materials_wait": "Materials Wait", "shift_handoff": "Shift Handoff",
     "quality_approval": "Quality Wait", "manager_approval": "Approval Wait",
     "makeready": "Makeready / Setup",
@@ -133,6 +133,8 @@ if "fwd_cat" not in st.session_state: st.session_state.fwd_cat = "jams"
 if "fwd_pct" not in st.session_state: st.session_state.fwd_pct = 0
 if "target_pct" not in st.session_state: st.session_state.target_pct = 10
 if "plan_moves" not in st.session_state: st.session_state.plan_moves = []
+if "group_fleet_losses" not in st.session_state:
+    st.session_state.group_fleet_losses = False
 
 # press_config lives in session state so settings panel edits flow into all calculations.
 # It starts as a deep copy of the defaults — user changes never touch the source of truth.
@@ -379,7 +381,15 @@ elif st.session_state.question == "backward":
     _, col_status, _ = st.columns([1, 4, 1])
 
     # ── LEVER GRID ───────────────────────────────────────────────────────
-    st.markdown(f'<div class="section-label" style="margin-top:0rem;">Recommended Action Plan (To hit +{ui_target_pct}% Target)</div>', unsafe_allow_html=True)
+    st.markdown(
+            """
+            <div style="margin-top: -2rem; margin-bottom: 1rem; font-size: 0.9rem; color: #9CA3AF; text-align: left;">
+                <i>All items show 20% improvement to hit +10% target</i>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+
 
     card_cols = st.columns(2)
     cum_closed = 0
@@ -403,32 +413,55 @@ elif st.session_state.question == "backward":
         is_top     = (i == 0)
         card_class = "lever-card top" if is_top else "lever-card"
 
-# Convert the decimal (0.2) to a clean integer (20)
         reduction_display = int(lev['reduction_pct'] * 100)
-
         hrs = lev.get('hours_saved', 0)
-
+        
         with card_cols[i % 2]:
+            border_color = C_OK if i == 0 else C_ACCENT
+            # Calculate current mins per shift and the new target
+            current_mps_val = (baseline * 60) / total_shifts
+            target_mps_val  = current_mps_val * (1 - lev['reduction_pct'])
+            
+            # Format for display
+            current_mps_str = f"{int(current_mps_val)}m"
+            target_mps_str  = f"{int(target_mps_val)}m"
             card_html = (
-                f'<div class="{card_class}" style="padding: 1rem; border-radius: 0.5rem; background: #1E293B; border: 1px solid #334155; border-left: 4px solid {C_ACCENT}; margin-bottom: 0.75rem;">'
-                f'<div style="font-size: 0.8rem; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">Step {i+1}</div>'
-                f'<div style="font-size: 1.1rem; font-weight: 600; color: #F8FAFC; margin-bottom: 0.75rem;">{lev["press"]} {label}</div>'
+                f'<div style="padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid #2D3748; '
+                f'border-left: 4px solid {border_color}; background: #1E293B; margin-bottom: 0.75rem; '
+                f'display: flex; align-items: center; justify-content: center; text-align: center;">'
                 
-                f'<div style="background: rgba(0,0,0,0.25); padding: 0.75rem; border-radius: 0.25rem; margin-bottom: 0.75rem; border: 1px solid #0F172A;">'
-                f'<div style="font-size: 0.95rem; color: #E2E8F0; margin-bottom: 0.3rem;"><b>Target:</b> Recover {hrs} hours</div>'
-                f'<div style="font-size: 0.85rem; color: #9CA3AF;"><b>Action:</b> Reduce occurrences by {reduction_display}%</div>'
+                # LEFT: Press Identity + The Action (Now on its own line)
+                f'<div style="flex: 1; min-width: 0;">'
+                f'<div style="font-size: 0.8rem; font-weight: 600; color: #9CA3AF;">#{i+1}: Press {lev["press"]}</div>'
+                f'<div style="font-size: 0.95rem; font-weight: 700; color: #FFFFFF; text-transform: uppercase;">{label}</div>'
                 f'</div>'
                 
-                f'<div style="display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 600; color: {C_ACCENT};">'
-                f'<div>+{fmt_k(lev["closes_sheets"])} Sheets</div>'
-                f'<div>{lev.get("pct_of_gap", 0):.0f}% of Gap</div>'
+                # CENTER: Current to Goal Transition
+                f'<div style="flex: 1.5; display: flex; flex-direction: column; justify-content: center; '
+                f'border-left: 1px solid #334155; border-right: 1px solid #334155; margin: 0 0.5rem; padding: 0 0.5rem;">'
+                f'<div style="font-size: 0.85rem; font-weight: 700; color: #FFFFFF;">'
+                f'<span style="color: #9CA3AF; font-weight: 400; font-size: 0.85rem;">SHIFT GOAL:</span> {target_mps_str}'
                 f'</div>'
+                f'<div style="font-size: 0.8rem; color: #EF4444; margin-top: 0.1rem;">'
+                f'<span style="font-size: 0.7rem;">▼</span> Current: {current_mps_str}'
+                f'</div>'
+                f'</div>'
+                
+                # RIGHT: The Output
+                f'<div style="flex: 1;">'
+                f'<div style="font-size: 1.5rem; font-weight: 800; color: {border_color}; line-height: 1;">'
+                f'+{fmt_k(lev["closes_sheets"])}'
+                f'</div>'
+                f'<div style="font-size: 0.7rem; font-weight: 600; color: #9CA3AF; text-transform: uppercase; margin-top: 0.2rem;">Sheets</div>'
+                f'</div>'
+                
                 f'</div>'
             )
             st.markdown(card_html, unsafe_allow_html=True)
+
+    st.markdown("<hr>", unsafe_allow_html=True)
     # ── WATERFALL CHART ──────────────────────────────────────────────────
     if plan["levers"]:
-        st.markdown('<div class="section-label" style="margin-top:1.5rem;">Projected Target Build-Up</div>', unsafe_allow_html=True)
 
         labels   = ["Now"]
         measures = ["absolute"]
@@ -492,62 +525,128 @@ elif st.session_state.question == "backward":
         )
 
         st.plotly_chart(fig_wf, use_container_width=True, config={"displayModeBar": False})
+        
 # ══════════════════════════════════════════════════════════════════════════
 # LOSSES — What are our biggest issues?
 # ══════════════════════════════════════════════════════════════════════════
 elif st.session_state.question == "losses":
-    st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown('<div class="section-label" style="margin-top:0rem;">Historical Constraints — Top Fleet Losses (April)</div>', unsafe_allow_html=True)
+    
+    # Ensure state exists
+    if "group_fleet_losses" not in st.session_state:
+        st.session_state.group_fleet_losses = False
 
+    # ── HEADER ROW WITH BUTTON ──────────────────────────────────────────
+    col_title, col_btn = st.columns([4, 1], vertical_alignment="bottom")
+    
+    with col_title:
+        st.markdown('<div class="section-label" style="margin-top:0.5rem; margin-bottom: 0.5rem;">Top Sheet Losses Per Month</div>', unsafe_allow_html=True)
+        
+    with col_btn:
+        btn_text = "Ungroup Presses" if st.session_state.group_fleet_losses else "Group All Presses"
+        if st.button(btn_text, key="btn_group_all", use_container_width=True):
+            st.session_state.group_fleet_losses = not st.session_state.group_fleet_losses
+            st.rerun()
+
+    # ── DATA PREPARATION ────────────────────────────────────────────────
     levers_raw = rank_opportunities(st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, reduction_pct=1.0)
     levers_full = [l for l in levers_raw if l["category"] != "speed"]
-    top_n  = min(10, len(levers_full))
-    levers = levers_full[:top_n]
+    
+    # Apply Grouping Logic if toggle is active
+    if st.session_state.group_fleet_losses:
+        grouped_levers = {}
+        for l in levers_full:
+            cat = l["category"]
+            if cat not in grouped_levers:
+                grouped_levers[cat] = {
+                    "category": cat,
+                    "press": "All",
+                    "sheets_gained": 0,
+                    "hours_saved": 0
+                }
+            grouped_levers[cat]["sheets_gained"] += l["sheets_gained"]
+            grouped_levers[cat]["hours_saved"] += l["hours_saved"]
+        
+        # Convert dictionary back to list and sort by sheets_gained descending
+        levers_to_process = list(grouped_levers.values())
+        levers_to_process.sort(key=lambda x: x["sheets_gained"], reverse=True)
+    else:
+        levers_to_process = levers_full
+    
+    if 'show_all_losses' not in st.session_state:
+        st.session_state.show_all_losses = False  
+        
+    top_n  = len(levers_to_process) if st.session_state.show_all_losses else min(10, len(levers_to_process))
+    levers = levers_to_process[:top_n]
 
-    bar_labels = [f"Press {l['press']} · {LEVER_LABELS.get(l['category'], l['category'])}" for l in levers]
+    # ── CHART FORMATTING ────────────────────────────────────────────────
+    bar_labels = []
+    bar_text = []
+    bar_mps = []
+    
+    for l in levers:
+        cat_label = LEVER_LABELS.get(l['category'], l['category'])
+        v = l["sheets_gained"]
+        
+        if l['press'] == "All":
+            bar_labels.append(f" ~ {cat_label}")
+            bar_text.append(f" ~ {cat_label}    ({fmt_k(v)})")
+            
+            # Calc fleet-wide average MPS
+            total_shifts = 0
+            for p_id, p_cfg in st.session_state.press_config.items():
+                total_shifts += p_cfg["days_scheduled"] * (2 if p_cfg["night_shift"] else 1)
+            mps_val = (l["hours_saved"] * 60) / total_shifts if total_shifts > 0 else 0
+            bar_mps.append(f"{int(mps_val)} min/shift (fleet avg)")
+        else:
+            bar_labels.append(f"Press {l['press']} · {cat_label}")
+            bar_text.append(f"  Press {l['press']} · {cat_label}    ({fmt_k(v)})")
+            bar_mps.append(fmt_mps(l["hours_saved"], st.session_state.press_config[l["press"]]))
+
     bar_vals   = [l["sheets_gained"] for l in levers]
     bar_hrs    = [l["hours_saved"] for l in levers]
     bar_colors = [C_OK if i == 0 else C_ACCENT if i <= 2 else C_MID for i in range(top_n)]
 
-    # Build mins-per-shift for hover tooltip — gives the floor manager a shift-level feel
-    # for what each loss category actually costs. "71.5 hrs/month" is abstract;
-    # "27 min/shift" is something you feel every day.
-    # TO BE ADDED: once job count data is available, add jobs-per-shift as a second
-    # translation layer (e.g., "that's ~3 jobs per shift lost to jams").
-    bar_mps = [fmt_mps(l["hours_saved"], st.session_state.press_config[l["press"]]) for l in levers]
-    
-    # Combine the title and the value into one string for the inside of the bar
-    bar_text   = [f"  Press {l['press']} · {LEVER_LABELS.get(l['category'], l['category'])}    (+{fmt_k(v)})" for l, v in zip(levers, bar_vals)]
-
+    dynamic_height = top_n * 35
     fig = go.Figure(go.Bar(
         x=bar_vals,
         y=bar_labels,  # Keep this for the hover popup
         orientation="h",
         marker_color=bar_colors,
         text=bar_text,
-        textposition="inside",
+        textposition="auto",
         insidetextanchor="start",  # Anchors text to the left side of the bar
         textfont=dict(family="IBM Plex Sans", size=13, color=C_WHITE),
-        hovertemplate="<b>%{y}</b><br>+%{x:,.0f} sheets (100% recovery)<br>%{customdata[0]} hrs/month · <b>%{customdata[1]}</b><extra></extra>",
+        hovertemplate="<b>%{y}</b><br>+%{x:,.0f} sheets (100% recovery)<br>%{customdata[0]:.1f} hrs/month · <b>%{customdata[1]}</b><extra></extra>",
         customdata=list(zip(bar_hrs, bar_mps)),
     ))
 
     fig.update_layout(
-        height=350,
+        height=dynamic_height,
         margin=dict(l=0, r=0, t=10, b=0),  # Removed left/right margins to maximize bar width
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(visible=False),
         yaxis=dict(
-            visible=False,  # Hides the external y-axis titles entirely
+            visible=False, 
             autorange="reversed",
         ),
         showlegend=False,
     )
 
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    
+    col_btn_show, _ = st.columns([1, 2])
+    with col_btn_show:
+        if not st.session_state.show_all_losses:
+            if st.button("Show all↓"):
+                st.session_state.show_all_losses = True
+                st.rerun()
+        else:
+            if st.button("Show less ↑"):
+                st.session_state.show_all_losses = False
+                st.rerun()
+                
     st.markdown(f"<div style='color:{C_MUTED};font-size:0.72rem;margin-top:-0.5rem;text-align:center;'>Green = highest impact · shows 100% theoretical recovery · hover for hrs/month and min/shift · calibrated to real Apr 2026 data</div>", unsafe_allow_html=True)
-
 # ══════════════════════════════════════════════════════════════════════════
 # PLAN — Build a cumulative improvement plan
 # ══════════════════════════════════════════════════════════════════════════
@@ -661,95 +760,135 @@ elif st.session_state.question == "plan":
             })
             st.rerun()
 
+
     st.markdown("<div style='margin-bottom:1.5rem;'></div>", unsafe_allow_html=True)
 
-
-
-    # ── MOVE LIST ─────────────────────────────────────────────────────────
-    if results:
-        bar_colors = [C_OK, C_ACCENT, "#F59E0B", "#06B6D4", "#8B5CF6", "#EC4899", "#14B8A6"]
-        assigned_colors = [bar_colors[i % len(bar_colors)] for i, _ in enumerate(results)]
-
-        st.markdown('<div class="section-label" style="margin-top:1.5rem; margin-bottom: 0.5rem;">Your plan</div>', unsafe_allow_html=True)
-
-        cum_gained = 0
-        to_remove  = None
+    # ── THE MASTER STACKED BAR ──────────────────────────────────────────
+    st.markdown('<div class="section-label" style="margin-top:1.5rem; margin-bottom: 0.5rem;">Visualized Plan Growth</div>', unsafe_allow_html=True)
+    
+    bar_colors = [C_OK, C_ACCENT, "#F59E0B", "#06B6D4", "#8B5CF6", "#EC4899", "#14B8A6"]
+    
+# 1. Build Committed Slices
+    committed_slices_html = ""
+    for i, r in enumerate(results):
+        w = (r["sheets_gained"] / gap * 100) if gap > 0 else 0
+        label = LEVER_LABELS.get(r["category"], r["category"])
+        display_press = "Fleet Wide" if r['press'] == "All" else f"Press {r['press']}"
         
-        max_gain = max(r["sheets_gained"] for r in results) if results else 1
+        # Calc MPS for tooltip and inner text
+        p_list = list(st.session_state.press_config.keys()) if r['press'] == "All" else [r['press']]
+        b_hrs, b_shifts = 0, 0
+        for p_id in p_list:
+            p_cfg = st.session_state.press_config[p_id]
+            n_s = p_cfg["days_scheduled"] * (2 if p_cfg["night_shift"] else 1)
+            b_shifts += n_s
+            b_hrs += n_s * (p_cfg["makeready_mins_per_shift"] / 60) if r["category"] == "makeready" else DEFAULT_DOWNTIME_CONFIG[p_id].get(r["category"], 0)
+        
+        m_curr = (b_hrs * 60) / b_shifts if b_shifts > 0 else 0
+        m_targ = ((b_hrs - r["hours_used"]) * 60) / b_shifts if b_shifts > 0 else 0
+        mps_str = f"{int(m_curr)}min —> {int(m_targ)}min"
+        
+        full_info = f"{display_press} | {label} | +{fmt_k(r['sheets_gained'])} sheets | {mps_str}"
+        bg_color = bar_colors[i % len(bar_colors)]
+        
+        # --- STEPPED TRUNCATION LOGIC ---
+        # Create a shorter press label for tight spaces (e.g. "P1" instead of "Press 1")
+        short_press = "All" if r['press'] == "All" else f"P{r['press']}"
+        
+        if w >= 25:
+            # Full detail
+            inner_text = f'<span style="padding-left:0.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{display_press} · {label} &nbsp;&nbsp;<b>+{fmt_k(r["sheets_gained"])}</b> &nbsp;&nbsp;<span style="opacity:0.7; font-size:0.8rem;">({mps_str})</span></span>'
+        elif w >= 12:
+            # Medium detail: Press + Math
+            inner_text = f'<span style="padding-left:0.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{display_press} &nbsp;&nbsp;<b>+{fmt_k(r["sheets_gained"])}</b></span>'
+        elif w >= 5:
+            # Low detail: Short Press + Math
+            inner_text = f'<span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{short_press} <b>+{fmt_k(r["sheets_gained"])}</b></span>'
+        else:
+            # Micro bar: Hide text, rely on hover
+            inner_text = ""
+        
+        committed_slices_html += f'<div title="{full_info}" style="width:{w}%; background:{bg_color}; height:100%; display:flex; align-items:center; justify-content:center; border-right:1px solid {C_DARK}; overflow:hidden; font-size:0.85rem; color:white;">{inner_text}</div>'
 
-        for i, r in enumerate(results):
-            cum_gained  += r["sheets_gained"]
-            cum_pct      = round(cum_gained / gap * 100, 1) if gap > 0 else 100
-            label        = LEVER_LABELS.get(r["category"], r["category"])
-            ltype        = LEVER_TYPE.get(r["category"], "Process")
-            hours_lost_warn = r["hours_used"] < r["hours_saved"]
+    # 2. Build Ghost Slice
+    ghost_html = ""
+    preview_gap_closed = gap_closed
+    
+    if add_pct > 0:
+        g_w = (p_gain / gap * 100) if gap > 0 else 0
+        g_color = bar_colors[len(results) % len(bar_colors)]
+        g_label = LEVER_LABELS.get(add_cat, add_cat)
+        preview_gap_closed = round((total_gained + p_gain) / gap * 100, 1) if gap > 0 else 100
+        
+        pre_press = "Fleet Wide" if add_press == "All" else f"Press {add_press}"
+        ghost_info = f"PREVIEW: {pre_press} | {g_label} | +{fmt_k(p_gain)} sheets"
+        
+        # --- STEPPED TRUNCATION LOGIC ---
+        short_pre_press = "All" if add_press == "All" else f"{add_press}"
+        
+        if g_w >= 25:
+            inner_ghost = f'<span style="padding-left:0.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{pre_press} · {g_label} &nbsp;&nbsp;<b>+{fmt_k(p_gain)}</b></span>'
+        elif g_w >= 12:
+            inner_ghost = f'<span style="padding-left:0.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{pre_press} &nbsp;&nbsp;<b>+{fmt_k(p_gain)}</b></span>'
+        elif g_w >= 5:
+            inner_ghost = f'<span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{short_pre_press} <b>+{fmt_k(p_gain)}</b></span>'
+        else:
+            inner_ghost = ""
             
-            width_pct = (r["sheets_gained"] / max_gain) * 100
-            bar_color = assigned_colors[i]
+        ghost_html = f'<div title="{ghost_info}" style="width:{g_w}%; background:{g_color}; opacity:0.6; height:100%; display:flex; align-items:center; justify-content:center; border: 1px dashed white; overflow:hidden; font-size:0.85rem; color:white;">{inner_ghost}</div>'
+    # 3. Render the combined Master Bar
+    master_bar_wrapper = f"""
+<div style="background:{C_MID}; border-radius:6px; height:50px; width:100%; display:flex; overflow:hidden; border:2px solid {C_MID}; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);">
+{committed_slices_html}{ghost_html}
+</div>
+<div style="display:flex; justify-content:space-between; font-size:0.75rem; color:{C_MUTED}; margin-top:0.4rem; padding:0 2px;">
+<span>Current: {fmt_k(current)}</span>
+<span style="color:{C_WHITE}; font-weight:600;">{preview_gap_closed:.0f}% of Gap Closed {"(Preview)" if add_pct > 0 else ""}</span>
+<span>Target: {fmt_k(target)}</span>
+</div>
+"""
 
+    st.markdown(master_bar_wrapper, unsafe_allow_html=True)
+
+    # ── THE SMALLER MANAGEMENT LIST ──────────────────────────────────────
+    if results:
+        st.markdown('<div class="section-label" style="margin-top:1.5rem; margin-bottom: 0.5rem;">Active Levers</div>', unsafe_allow_html=True)
+        to_remove = None
+        for i, r in enumerate(results):
+            label = LEVER_LABELS.get(r["category"], r["category"])
             display_press = "Fleet Wide" if r['press'] == "All" else f"Press {r['press']}"
+            
+            # Restore the MPS math for the list view
+            p_list = list(st.session_state.press_config.keys()) if r['press'] == "All" else [r['press']]
+            b_hrs, b_shifts = 0, 0
+            for p_id in p_list:
+                p_cfg = st.session_state.press_config[p_id]
+                n_s = p_cfg["days_scheduled"] * (2 if p_cfg["night_shift"] else 1)
+                b_shifts += n_s
+                b_hrs += n_s * (p_cfg["makeready_mins_per_shift"] / 60) if r["category"] == "makeready" else DEFAULT_DOWNTIME_CONFIG[p_id].get(r["category"], 0)
+            
+            m_curr = (b_hrs * 60) / b_shifts if b_shifts > 0 else 0
+            m_targ = ((b_hrs - r["hours_used"]) * 60) / b_shifts if b_shifts > 0 else 0
+            mps_str = f"{int(m_curr)}min —> {int(m_targ)}min"
 
-            col_bar, col_del = st.columns([15, 1])
-            with col_bar:
-                warn_html = ""
-                if hours_lost_warn:
-                    clipped = r["hours_saved"] - r["hours_used"]
-                    warn_html = f"<span style='color:{C_ALERT}; margin-left:1rem; font-size:0.75rem;'>⚠ {fmt_hrs(clipped)} clipped</span>"
-                
+            col_txt, col_del = st.columns([15, 1])
+            with col_txt:
                 st.markdown(f"""
-                <div style="width:100%; background: linear-gradient(to right, {bar_color} {width_pct}%, transparent {width_pct}%); min-height:36px; display:flex; align-items:center; border-radius:2px; margin-top:0.1rem;">
-                    <span style="font-family:'IBM Plex Sans', sans-serif; font-size:0.9rem; color:{C_WHITE}; padding-left:0.6rem; white-space:nowrap;">
-                        {display_press} · {label} &nbsp;&nbsp;<b>+{fmt_k(r['sheets_gained'])}</b>
-                    </span>
-                    {warn_html}
+                <div style="font-size:0.85rem; color:{C_MUTED}; display:flex; align-items:center; gap:10px; padding-top:0.3rem;">
+                    <div style="width:10px; height:10px; background:{bar_colors[i % len(bar_colors)]}; border-radius:2px;"></div>
+                    <span style="color:{C_WHITE}; font-weight:600;">{display_press}</span> 
+                    <span>{label}</span>
+                    <span style="margin-left:auto; font-family:'IBM Plex Mono'; color:{C_OK}; font-weight:600;">+{fmt_k(r['sheets_gained'])}</span>
+                    <span style="opacity:0.7; font-size:0.8rem; margin-left:10px;">({mps_str})</span>
                 </div>
                 """, unsafe_allow_html=True)
-
             with col_del:
-                if st.button("✕", key=f"del_{i}", help="Remove this lever"):
+                if st.button("✕", key=f"del_{i}", help="Remove from plan"):
                     to_remove = i
-
+        
         if to_remove is not None:
             st.session_state.plan_moves.pop(to_remove)
             st.rerun()
-
-# ── STACKED PROGRESS BAR ──────────────────────────────────────────────
-    st.markdown(f"""
-    <div style="margin-top:1.5rem;">
-        <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;
-                    color:{C_MUTED};margin-bottom:0.4rem;text-align:center;">
-            Progress to target
-        </div>
-        <div style="background:{C_MID};border-radius:3px;height:14px;width:100%;display:flex;overflow:hidden;">
-            {"".join([
-                f'<div title="{LEVER_LABELS.get(r["category"])} · +{fmt_k(r["sheets_gained"])}" '
-                f'style="width:{min(r["sheets_gained"]/gap*100, 100):.2f}%;'
-                f'background:{assigned_colors[i]};'
-                f'height:100%;"></div>'
-                for i, r in enumerate(results)
-            ])}
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:0.72rem;
-                    color:{C_MUTED};margin-top:0.4rem;">
-            <span>{fmt_k(current)}</span>
-            <span style="color:{C_OK if gap_closed >= 100 else C_WHITE};">
-                {gap_closed:.0f}% closed
-            </span>
-            <span>Target: {fmt_k(target)}</span>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.8rem;">
-            {"".join([
-                f'<div style="display:flex;align-items:center;gap:0.4rem;">'
-                f'<div style="width:10px;height:10px;border-radius:2px;'
-                f'background:{bar_colors[i % len(bar_colors)]};flex-shrink:0;"></div>'
-                f'<span style="font-size:0.72rem;color:{C_MUTED};">#{i+1} {r["press"]} · '
-                f'{LEVER_LABELS.get(r["category"])}</span></div>'
-                for i, r in enumerate(results)
-            ])}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
 
 
 # ── FOOTER ────────────────────────────────────────────────────────────────
