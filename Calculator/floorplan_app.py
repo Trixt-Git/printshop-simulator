@@ -14,12 +14,6 @@ import plotly.graph_objects as go
 import sys, os, copy
 import pandas as pd
 
-# ── DOCS (Assigned to variable so it doesn't render as a gap) ─────────────
-_docs = """
-FloorPlan — Press Room Decision Engine
-========================================
-Production improvement advisor for the floor manager.
-"""
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from floorplan_calculator import (
@@ -49,9 +43,9 @@ LEVER_TYPE = {
 
 }
 DOWNTIME_CODE_MAP = {
-    "maintenance": ["2011 (Unplanned Maint)", "2000 (Breakdown Mech)", "2001 (Breakdown Elec))"],
-    "jams": ["2070 (Jam/Trip)", "2085 (Problem: Print Unit)", "2086 (Material Feeder)", "2087 (UR/IV Lamp)", "2097 (Problem: Feeder)"],
-    "materials_wait": ["2040 (Wait for Material)", "2095 (Replace Materials)"],
+    "maintenance": ["2011 (Unplanned Maint)", "2000 (Breakdown Mech)", "2001 (Breakdown Elec)"],
+    "jams": ["2070 (Jam/Trip)", "2085 (Problem: Print Unit)", "2086 (Material Feeder)", "2087 (UV/IR Lamp)", "2097 (Problem: Feeder)"],
+    "materials_wait": ["2090 (Wait for Material)", "2095 (Replace Materials)"],
     "shift_handoff": ["2040 (Shift Change/Handoff)"],
     "quality_approval": ["2120 (Quality Wait)", "2123 (Waiting for Quality)"],
     "manager_approval": ["2080 (Wait for Approval)", "2121 (Sales Wait)", "2124 (Waiting for Sales)", "2125 (Waiting for Customer)"],
@@ -318,128 +312,10 @@ if q2.button("🎯 Path to target", key="btn_bwd",use_container_width=True): st.
 if q3.button("🔧 Build a plan", key="btn_plan",use_container_width=True): st.session_state.question = "plan"; st.rerun()
 if q4.button("Deep Dive 🔍", use_container_width=True): st.session_state.question = "deep_dive";st.rerun()
 if q5.button("Reset", key="btn_reset",use_container_width=True): 
-    st.session_state.question = "forward"; st.session_state.fwd_pct = 0
+    st.session_state.question = "losses"; st.session_state.fwd_pct = 0
     st.session_state.plan_moves = []; st.rerun()
 
 #Order was switched, Losses is now default view.
-
-# # ══════════════════════════════════════════════════════════════════════════
-# # FORWARD — What if we improve something?
-# # ══════════════════════════════════════════════════════════════════════════
-# if st.session_state.question == "forward":
-#     st.markdown("<hr>", unsafe_allow_html=True)
-    
-#     # 1. Inputs across the top
-#     col_press, col_cat, col_pct = st.columns(3)
-
-#     with col_press:
-#         press_options = ["All"] + list(st.session_state.press_config.keys())
-#         press = st.selectbox(
-#             "Press",
-#             options=press_options,
-#             index=press_options.index(st.session_state.fwd_press) if st.session_state.fwd_press in press_options else 0,
-#             key="sel_press",
-#         )
-#         st.session_state.fwd_press = press
-
-#     with col_cat:
-#         cat = st.selectbox(
-#             "What are you improving?",
-#             options=list(LEVER_LABELS.keys()),
-#             format_func=lambda x: LEVER_LABELS[x],
-#             index=list(LEVER_LABELS.keys()).index(st.session_state.fwd_cat),
-#             key="sel_cat",
-#         )
-#         st.session_state.fwd_cat = cat
-
-#     with col_pct:
-#         pct = st.slider(
-#             "By how much?",
-#             min_value=0,
-#             max_value=100,
-#             value=st.session_state.fwd_pct,
-#             step=5,
-#             format="%d%%",
-#             key="sl_pct",
-#         )
-#         st.session_state.fwd_pct = pct
-
-#     st.markdown("<div style='margin-bottom:1.5rem;'></div>", unsafe_allow_html=True)
-
-#     # 2. Results underneath
-#     gained       = 0
-#     hrs_saved    = 0
-#     hrs_used     = 0
-#     baseline_hrs = 0
-    
-#     presses_to_calc = list(st.session_state.press_config.keys()) if press == "All" else [press]
-    
-#     for p in presses_to_calc:
-#         result = lever_impact(p, cat, pct / 100, st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG)
-#         gained    += result["sheets_gained"]
-#         hrs_saved += result["hours_saved"]
-#         hrs_used  += result["hours_used"]
-        
-#         if cat == "makeready":
-#             cfg = st.session_state.press_config[p]
-#             shifts_per_day = 2 if cfg["night_shift"] else 1
-#             total_shifts = cfg["days_scheduled"] * shifts_per_day
-#             baseline_hrs += round(total_shifts * (cfg["makeready_mins_per_shift"] / 60), 1)
-#         else:
-#             baseline_hrs += DEFAULT_DOWNTIME_CONFIG[p].get(cat, 0)
-            
-#     new_hrs      = round(baseline_hrs - hrs_used, 1)
-#     gap_closed   = round(gained / gap * 100, 1) if gap > 0 else 100
-#     new_total    = current + gained
-    
-#     display_name = "Fleet Wide" if press == "All" else f"Press {press}"
-#     callout_class = "result-callout success" if gap_closed >= 100 else "result-callout"
-    
-#     # Place the boxes side-by-side
-#     col_res_left, col_res_right = st.columns(2)
-    
-#     with col_res_left:
-#         st.markdown(f"""
-#         <div class="{callout_class}" style="margin-bottom:0; height:100%; display:flex; flex-direction:column; justify-content:center;">
-#             <div style="font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:{C_MUTED};margin-bottom:0.4rem;">Sheets gained</div>
-#             <div style="font-family:'IBM Plex Mono',monospace;font-size:2.2rem;font-weight:700;color:{C_OK};">+{fmt_k(gained)}</div>
-#             <div style="font-size:0.85rem;color:{C_MUTED};margin-top:0.3rem;">New fleet total: {fmt_k(new_total)} &nbsp;·&nbsp; Gap closed: {gap_closed:.0f}%</div>
-#         </div>
-#         """, unsafe_allow_html=True)
-
-#     with col_res_right:
-#         st.markdown(f"""
-#         <div class="lever-card" style="margin-bottom:0; height:100%;">
-#             <div>
-#                 <div class="lever-press">{display_name} · {LEVER_LABELS[cat]}</div>
-#                 <div class="lever-name" style="font-size:1.1rem; margin-top:0.3rem;">{round(baseline_hrs, 1)} → {new_hrs} hrs/mo</div>
-#             </div>
-#             <div>
-#                 <div class="lever-gain" style="font-size:1.8rem;">{fmt_hrs(hrs_used)}</div>
-#                 <div class="lever-hrs">recovered</div>
-#             </div>
-#         </div>
-#         """, unsafe_allow_html=True)
-
-#     # Warnings and progress bar span the full width underneath
-#     if hrs_used < hrs_saved:
-#         st.markdown(f"<div style='color:{C_MUTED};font-size:0.78rem;text-align:center;margin-top:1rem;'>⚠ {display_name} only has {fmt_hrs(hrs_used)} of hours_lost — {fmt_hrs(hrs_saved - hrs_used)} saved but at capacity.</div>", unsafe_allow_html=True)
-
-#     progress_pct   = min(gap_closed / 100, 1.0)
-#     bar_fill_color = C_OK if gap_closed >= 100 else C_ACCENT
-
-#     st.markdown(f"""
-#     <div style="margin-top:1.5rem;">
-#         <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:{C_MUTED};margin-bottom:0.4rem;text-align:center;">Progress to target</div>
-#         <div style="background:{C_MID};border-radius:3px;height:10px;width:100%;">
-#             <div style="background:{bar_fill_color};border-radius:3px;height:10px;width:{progress_pct*100:.0f}%;"></div>
-#         </div>
-#         <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:{C_MUTED};margin-top:0.4rem;">
-#             <span>{fmt_k(current)}</span><span>Target: {fmt_k(target)}</span>
-#         </div>
-#     </div>
-#     """, unsafe_allow_html=True)
-
 
 # ══════════════════════════════════════════════════════════════════════════
 # BACKWARD — What do we need to hit target?
@@ -944,7 +820,7 @@ elif st.session_state.question == "deep_dive":
         total_fleet_shifts = sum(
             cfg["days_scheduled"] * (2 if cfg["night_shift"] else 1)
             for cfg in st.session_state.press_config.values()
-    )
+        )
         grouped = {}
         for r in df_rows:
             key = r["Reason"]
