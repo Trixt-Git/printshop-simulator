@@ -12,6 +12,7 @@ Requires floorplan_calculator.py in the same directory.
 import streamlit as st
 import plotly.graph_objects as go
 import sys, os, copy
+import pandas as pd
 
 # ── DOCS (Assigned to variable so it doesn't render as a gap) ─────────────
 _docs = """
@@ -48,14 +49,72 @@ LEVER_TYPE = {
 
 }
 DOWNTIME_CODE_MAP = {
-    "maintenance": ["401 (Mech)", "402 (Elec)", "410 (Software)"],
-    "jams": ["501 (Feeder)", "502 (Delivery)", "505 (Transfer)"],
-    "materials_wait": ["201 (Ink)", "301 (Paper)"],
-    "shift_handoff": ["901 (Shift Change)", "902 (Cleanup)"],
-    "quality_approval": ["601 (Color)", "605 (Reg)"],
-    "manager_approval": ["701 (Approval Wait)"],
-    "makeready": ["101 (Plates)", "102 (Washup)"]
+    "maintenance": ["2011 (Unplanned Maint)", "2000 (Breakdown Mech)", "2001 (Breakdown Elec))"],
+    "jams": ["2070 (Jam/Trip)", "2085 (Problem: Print Unit)", "2086 (Material Feeder)", "2087 (UR/IV Lamp)", "2097 (Problem: Feeder)"],
+    "materials_wait": ["2040 (Wait for Material)", "2095 (Replace Materials)"],
+    "shift_handoff": ["2040 (Shift Change/Handoff)"],
+    "quality_approval": ["2120 (Quality Wait)", "2123 (Waiting for Quality)"],
+    "manager_approval": ["2080 (Wait for Approval)", "2121 (Sales Wait)", "2124 (Waiting for Sales)", "2125 (Waiting for Customer)"],
+    "makeready": ["1000 (Make Ready 1)", "1010 (Make Ready 2)", "1060 (Cleanup/Washup)", "2075 (Wash Plates/Blankets)", "2076 (Set-Up Adjustment)","2083 (Plate Change)", "2084 (Anilox Roller Change)"],
 }
+
+CODE_HOUR_SPLITS = {
+    "2190": {
+        "maintenance":      {"2001": 6.2,  "2000": 10.57, "2011": 20.43},
+        "jams":             {"2086": 0.52, "2087": 5.12,  "2097": 1.63,  "2070": 3.08,  "2085": 35.27},
+        "shift_handoff":    {"2040": 17.69},
+        "materials_wait":   {"2095": 0.19, "2090": 1.34},
+        "quality_approval": {"2123": 0.28, "2120": 2.43},
+        "manager_approval": {"2080": 5.29, "2122": 0.0,  "2121": 0.0,  "2124": 0.0,  "2125": 0.0},
+        "makeready":        {"1010": 57.31,"1000": 11.16, "2075": 38.15,"2076": 14.49,"1060": 16.95,"2083": 23.88,"2082": 6.26, "2084": 0.0},
+    },
+    "2160": {
+        "maintenance":      {"2001": 5.66, "2000": 19.43, "2011": 9.81},
+        "jams":             {"2086": 5.52, "2087": 0.62,  "2097": 6.6,   "2070": 31.79, "2085": 13.24},
+        "shift_handoff":    {"2040": 4.29},
+        "materials_wait":   {"2095": 0.06, "2090": 9.14},
+        "quality_approval": {"2123": 0.14, "2120": 3.97},
+        "manager_approval": {"2080": 5.12, "2122": 0.74, "2121": 0.24, "2124": 0.0,  "2125": 0.0},
+        "makeready":        {"1010": 126.01,"1000": 44.62,"2075": 17.81,"2076": 3.31, "1060": 5.63, "2083": 0.58, "2082": 7.83, "2084": 1.37},
+    },
+    "2150": {
+        "maintenance":      {"2001": 8.91, "2000": 24.3,  "2011": 8.82},
+        "jams":             {"2086": 31.25,"2087": 1.26,  "2097": 3.51,  "2070": 19.24, "2085": 16.21},
+        "shift_handoff":    {"2040": 3.98},
+        "materials_wait":   {"2095": 13.25,"2090": 7.29},
+        "quality_approval": {"2123": 2.2,  "2120": 5.18},
+        "manager_approval": {"2080": 1.51, "2122": 0.0,  "2121": 0.0,  "2124": 0.02, "2125": 0.0},
+        "makeready":        {"1010": 69.86,"1000": 9.93,  "2075": 46.6, "2076": 7.46, "1060": 16.19,"2083": 4.81, "2082": 16.02,"2084": 1.11},
+    },
+    "2500": {
+        "maintenance":      {"2001": 2.34, "2000": 12.19, "2011": 4.32},
+        "jams":             {"2086": 4.68, "2087": 0.0,   "2097": 8.63,  "2070": 22.79, "2085": 7.83},
+        "shift_handoff":    {"2040": 3.69},
+        "materials_wait":   {"2095": 1.25, "2090": 5.77},
+        "quality_approval": {"2123": 0.03, "2120": 0.49},
+        "manager_approval": {"2080": 3.45, "2122": 0.21, "2121": 0.0,  "2124": 0.0,  "2125": 0.06},
+        "makeready":        {"1010": 36.28,"1000": 10.12, "2075": 27.41,"2076": 4.83, "1060": 17.23,"2083": 0.71, "2082": 2.15, "2084": 0.24},
+    },
+    "2330": {
+        "maintenance":      {"2001": 5.13, "2000": 5.51,  "2011": 1.07},
+        "jams":             {"2086": 2.64, "2087": 0.0,   "2097": 10.12, "2070": 6.61,  "2085": 3.76},
+        "shift_handoff":    {"2040": 1.66},
+        "materials_wait":   {"2095": 0.66, "2090": 3.95},
+        "quality_approval": {"2123": 0.11, "2120": 0.16},
+        "manager_approval": {"2080": 0.33, "2122": 0.0,  "2121": 0.0,  "2124": 0.0,  "2125": 0.0},
+        "makeready":        {"1010": 14.0, "1000": 4.29,  "2075": 9.08, "2076": 1.6,  "1060": 6.59, "2083": 0.13, "2082": 0.95, "2084": 0.0},
+    },
+    "2060": {
+        "maintenance":      {"2001": 2.51, "2000": 13.44, "2011": 14.13},
+        "jams":             {"2086": 4.13, "2087": 15.12, "2097": 2.37,  "2070": 0.44,  "2085": 22.05},
+        "shift_handoff":    {"2040": 11.99},
+        "materials_wait":   {"2095": 0.51, "2090": 6.19},
+        "quality_approval": {"2123": 0.0,  "2120": 0.06},
+        "manager_approval": {"2080": 1.37, "2122": 0.0,  "2121": 0.0,  "2124": 0.0,  "2125": 0.0},
+        "makeready":        {"1010": 51.24,"1000": 6.5,   "2075": 4.8,  "2076": 19.58,"1060": 7.77, "2083": 2.79, "2082": 1.54, "2084": 0.0},
+    },
+}
+
 
 C_DARK, C_MID, C_MUTED, C_WHITE = "#111827", "#374151", "#6B7280", "#FFFFFF"
 C_ACCENT, C_ALERT, C_OK = "#2563EB", "#DC2626", "#16A34A"
@@ -144,6 +203,9 @@ if "target_pct" not in st.session_state: st.session_state.target_pct = 10
 if "plan_moves" not in st.session_state: st.session_state.plan_moves = []
 if "group_fleet_losses" not in st.session_state:
     st.session_state.group_fleet_losses = False
+if "dd_group_mode" not in st.session_state:
+    st.session_state.dd_group_mode = "detailed"
+
 
 # press_config lives in session state so settings panel edits flow into all calculations.
 # It starts as a deep copy of the defaults — user changes never touch the source of truth.
@@ -409,10 +471,11 @@ elif st.session_state.question == "backward":
         ltype      = LEVER_TYPE.get(lev["category"], "")
         p_cfg      = st.session_state.press_config[lev["press"]]
         
+        cfg = p_cfg
+        shifts_per_day = 2 if cfg["night_shift"] else 1
+        total_shifts = cfg["days_scheduled"] * shifts_per_day
+        
         if lev["category"] == "makeready":
-            cfg = p_cfg
-            shifts_per_day = 2 if cfg["night_shift"] else 1
-            total_shifts = cfg["days_scheduled"] * shifts_per_day
             baseline = round(total_shifts * (cfg["makeready_mins_per_shift"] / 60), 1)
         else:
             baseline = DEFAULT_DOWNTIME_CONFIG[lev["press"]].get(lev["category"], 0)
@@ -786,6 +849,8 @@ elif st.session_state.question == "plan":
 # ══════════════════════════════════════════════════════════════════════════
 # DEEP DIVE — Code-Level Detailed Audit
 # ══════════════════════════════════════════════════════════════════════════
+
+
 elif st.session_state.question == "deep_dive":
     if "dd_filter_press" not in st.session_state:
         st.session_state.dd_filter_press = "All"
@@ -801,16 +866,26 @@ elif st.session_state.question == "deep_dive":
         label = f"[{opt}]" if st.session_state.dd_filter_press == opt else str(opt)
         if cols[i].button(label, key=f"dd_filter_{opt}", use_container_width=True):
             st.session_state.dd_filter_press = opt
+            if opt != "All":
+                st.session_state.dd_group_mode = "detailed"
             st.rerun()
 
     # ── 2. CODE-SPECIFIC DATA TABLE (FILTERED) ───────────────────────────
-    st.markdown('<div class="section-label" style="margin-top:1.5rem; margin-bottom:1rem;">Full Audit: Press & Code Breakdown</div>', unsafe_allow_html=True)
-    
     raw_levers = rank_opportunities(st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, reduction_pct=1.0)
     
     df_rows = []
     active_press = st.session_state.dd_filter_press
     levers_to_render = [l for l in raw_levers if active_press == "All" or l["press"] == active_press]
+    col_label, col_btn = st.columns([4, 1], vertical_alignment="bottom")
+    with col_label:
+        st.markdown('<div class="section-label" style="margin-top:1.5rem; margin-bottom:1rem;">Full Audit: Press & Code Breakdown</div>', unsafe_allow_html=True)
+    with col_btn:
+        if st.session_state.dd_filter_press == "All":
+            mode_labels = {"detailed": "Group by Press", "by_press": "Group by Code", "by_code": "Show Detail"}
+            if st.button(mode_labels[st.session_state.dd_group_mode], use_container_width=True):
+                cycle = {"detailed": "by_press", "by_press": "by_code", "by_code": "detailed"}
+                st.session_state.dd_group_mode = cycle[st.session_state.dd_group_mode]
+                st.rerun()
 
     for l in levers_to_render:
         if l["category"] == "speed": continue
@@ -821,9 +896,18 @@ elif st.session_state.question == "deep_dive":
         p_cfg = st.session_state.press_config[l["press"]]
         n_s = p_cfg["days_scheduled"] * (2 if p_cfg["night_shift"] else 1)
         
+        press_splits = CODE_HOUR_SPLITS.get(l["press"], {}).get(l["category"], {})
+        total_split_hrs = sum(press_splits.values()) if press_splits else 0
+        
         for code_desc in specific_codes:
-            code_sheets = l["sheets_gained"] / num_codes
-            code_hours = l["hours_saved"] / num_codes
+            code_num = code_desc.split(" ")[0]
+            if total_split_hrs > 0 and code_num in press_splits:
+                proportion = press_splits[code_num] / total_split_hrs
+            else:
+                proportion = 1 / num_codes
+            code_sheets = l["sheets_gained"] * proportion
+            code_hours = l["hours_saved"] * proportion 
+            
             code_mps = (code_hours * 60) / n_s if n_s > 0 else 0
             
             df_rows.append({
@@ -835,50 +919,83 @@ elif st.session_state.question == "deep_dive":
                 "Mins/Shift": int(code_mps)
             })
 
-    df_rows.sort(key=lambda x: x["Sheets Lost"], reverse=True)
+    if st.session_state.dd_group_mode == "by_press":
+        grouped = {}
+        for r in df_rows:
+            p = r["Press"]
+            if p not in grouped:
+                p_id = p.replace("Press ", "")
+                p_cfg = st.session_state.press_config[p_id]
+                n_s = p_cfg["days_scheduled"] * (2 if p_cfg["night_shift"] else 1)
+                grouped[p] = {"Press": p, "Reason": "All categories", "Overall": "—", 
+                            "Sheets Lost": 0, "Hours Lost": 0.0, "_shifts": n_s}
+            grouped[p]["Sheets Lost"] += r["Sheets Lost"]
+            grouped[p]["Hours Lost"] += r["Hours Lost"]
+        
+        df_rows = []
+        for row in grouped.values():
+            row["Mins/Shift"] = int((row["Hours Lost"] * 60) / row["_shifts"]) if row["_shifts"] > 0 else 0
+            del row["_shifts"]
+            df_rows.append(row)
+        df_rows.sort(key=lambda x: x["Sheets Lost"], reverse=True)
+
+
+    elif st.session_state.dd_group_mode == "by_code":
+        total_fleet_shifts = sum(
+            cfg["days_scheduled"] * (2 if cfg["night_shift"] else 1)
+            for cfg in st.session_state.press_config.values()
+    )
+        grouped = {}
+        for r in df_rows:
+            key = r["Reason"]
+            if key not in grouped:
+                grouped[key] = {"Press": "All", "Reason": r["Reason"], "Overall": r["Overall"],
+                            "Sheets Lost": 0, "Hours Lost": 0.0}
+            grouped[key]["Sheets Lost"] += r["Sheets Lost"]
+            grouped[key]["Hours Lost"] += r["Hours Lost"]
+        
+        df_rows = []
+        for row in grouped.values():
+            row["Mins/Shift"] = int((row["Hours Lost"] * 60) / total_fleet_shifts) if total_fleet_shifts > 0 else 0
+            df_rows.append(row)
+        df_rows.sort(key=lambda x: x["Sheets Lost"], reverse=True)
+
+
 
     st.dataframe(
-        df_rows,
+        pd.DataFrame(df_rows).sort_values(by="Sheets Lost", ascending=False),
         use_container_width=True,
         hide_index=True,
         column_config={
-            "Press": st.column_config.TextColumn("Press", width="small"),
-            "Reason": st.column_config.TextColumn("Specific Code / Reason", width="large"),
-            "Overall": st.column_config.TextColumn("Overall Category", width="medium"),
+            "Press": st.column_config.TextColumn("Press",width="small"),
+            "Overall": st.column_config.TextColumn("Category",width="small"),
+            "Reason": st.column_config.TextColumn("Code",width="small"),
             "Sheets Lost": st.column_config.ProgressColumn(
                 "Sheet Loss",
-                format="%d",
+                format="%,.0f",
                 min_value=0,
                 max_value=max([r["Sheets Lost"] for r in df_rows]) if df_rows else 1,
+                width="large"
             ),
-            "Hours Lost": st.column_config.NumberColumn("Hrs/Mo", format="%.1f"),
-            "Mins/Shift": st.column_config.NumberColumn("Impact", format="%d min"),
+            "Hours Lost": st.column_config.NumberColumn("Hrs/Mo", format="%.1f hrs",),
+            "Mins/Shift": st.column_config.NumberColumn("Min/Shift", format="%d min"),
         }
     )
 
-    # ── 3. CODE MAPPING GRID (REFERENCE CARDS) ───────────────────────────
-    st.markdown('<div class="section-label" style="margin-top:2.5rem; margin-bottom: 0.8rem;">Downtime Reason Code Reference</div>', unsafe_allow_html=True)
-    
-    map_cols = st.columns(3)
-    for i, (cat_key, codes) in enumerate(DOWNTIME_CODE_MAP.items()):
-        with map_cols[i % 3]:
-            st.markdown(f"""
-                <div style="background:{C_MID}; padding:0.8rem; border-radius:4px; border-left:3px solid {C_ACCENT}; margin-bottom:0.8rem; min-height:85px;">
-                    <div style="font-size:0.65rem; color:{C_MUTED}; text-transform:uppercase; letter-spacing:0.1em; font-weight:700;">{LEVER_LABELS.get(cat_key, cat_key)}</div>
-                    <div style="font-family:'IBM Plex Mono', monospace; font-size:0.82rem; color:{C_WHITE}; margin-top:0.4rem; line-height:1.4;">
-                        {", ".join(codes)}
+    # ── 3. CODE MAPPING GRID (REFERENCE CARDS) ───────────────────────────  
+    with st.expander("Downtime Reason Code Reference", expanded=False):
+        map_cols = st.columns(4)
+        for i, (cat_key, codes) in enumerate(DOWNTIME_CODE_MAP.items()):
+            with map_cols[i % 4]:
+                st.markdown(f"""
+                    <div style="background:{C_MID}; padding:0.8rem; border-radius:4px; border-left:3px solid {C_ACCENT}; margin-bottom:0.8rem; min-height:85px;">
+                        <div style="font-size:0.65rem; color:{"#9CA3AF"}; text-transform:uppercase; letter-spacing:0.1em; font-weight:700;">{LEVER_LABELS.get(cat_key, cat_key)}</div>
+                        <div style="font-family:'IBM Plex Mono', monospace; font-size:0.82rem; color:{C_WHITE}; margin-top:0.4rem; line-height:1.4;">
+                            {"<br>".join(codes)}
+                        </div>
                     </div>
-                </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
 
-    st.markdown(f"""
-        <div style="background:#1e293b; border:1px solid #334155; border-radius:4px; padding:0.75rem; margin-top:1.5rem; display:flex; align-items:center; gap:12px;">
-            <span style="font-size:1.2rem;">🔍</span>
-            <span style="color:{C_MUTED}; font-size:0.82rem; line-height:1.4;">
-                <b>Active Filter:</b> Showing data for <b>{active_press}</b>. Use the glossary above to see which machine codes feed into the high-level categories.
-            </span>
-        </div>
-    """, unsafe_allow_html=True)
 # ── FOOTER ────────────────────────────────────────────────────────────────
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(f"<div style='color:{C_MUTED};font-size:0.7rem;'>FloorPlan v1.0 · RRD Press Room · Calibrated Q1–Apr 2026 · Fleet accuracy -2.1% vs actual</div>", unsafe_allow_html=True)
