@@ -13,17 +13,21 @@ import streamlit as st
 import plotly.graph_objects as go
 import sys, os, copy
 import pandas as pd
-
-
+from datetime import datetime
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from floorplan_calculator import (
     DEFAULT_PRESS_CONFIG,
     DEFAULT_DOWNTIME_CONFIG,
+    _PRESSES,
     fleet_summary,
     rank_opportunities,
     what_would_it_take,
     lever_impact,
+    get_available_months,
+    load_range,
+    load_total,
 )
+
 
 # ── CONFIG ────────────────────────────────────────────────────────────────
 IMPROVEMENT_PCT   = 0.2
@@ -135,6 +139,29 @@ if "group_fleet_losses" not in st.session_state:
     st.session_state.group_fleet_losses = False
 if "dd_group_mode" not in st.session_state:
     st.session_state.dd_group_mode = "detailed"
+if "selected_months" not in st.session_state:
+    st.session_state.selected_months = get_available_months()
+    
+if "range_mode" not in st.session_state:
+    st.session_state.range_mode = "avg"
+
+available_months = get_available_months()
+
+if "start_month" not in st.session_state:
+    st.session_state.start_month = available_months[0]
+if "end_month" not in st.session_state:
+    st.session_state.end_month = available_months[-1]
+
+if st.session_state.start_month > st.session_state.end_month:
+    st.session_state.end_month = st.session_state.start_month
+    
+if st.session_state.range_mode == "avg":
+    _active_presses = load_range(st.session_state.start_month, st.session_state.end_month)
+else:
+    _active_presses = load_total(st.session_state.start_month, st.session_state.end_month)
+
+
+
 
 
 # press_config lives in session state so settings panel edits flow into all calculations.
@@ -160,15 +187,64 @@ def fmt_mps(hours: float, cfg: dict) -> str:
     mps = mins_per_shift(hours, cfg)
     return f"{mps:.0f} min/shift"
 
+def fmt_duration(minutes: float) -> str:
+    """Format minutes as 'Xh Ym' if >= 60, else 'Xm'."""
+    if minutes >= 60:
+        h = int(minutes // 60)
+        m = int(minutes % 60)
+        return f"{h}h {m}m" if m > 0 else f"{h}h"
+    return f"{int(minutes)}m"
+
+
 # ── HEADER ────────────────────────────────────────────────────────────────
-col_head, col_targ = st.columns([6, 1])
-fleet      = fleet_summary(st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG)
+col_head, col_range, col_targ = st.columns([6, 1, 1])
+fleet      = fleet_summary(_active_presses)
 current    = fleet["total_reality"]
 with col_head:
     st.markdown(f"""
         <div style="font-size: 2rem; font-weight: 700; margin-bottom: 0rem; line-height: 1.2;">FloorPlan</div>
         <div style="color:{C_MUTED}; font-size: 0.8rem; margin-top: 0.1rem; margin-bottom: 1rem;">Press Room Decision Engine · Calibrated Q1–Apr 2026</div>
     """, unsafe_allow_html=True)
+
+with col_range:
+    st.markdown("<div style='margin-top:0.8rem;'></div>", unsafe_allow_html=True)
+    with st.popover("📅 Range", use_container_width=True):
+        if len(available_months) > 1:
+            
+            st.session_state.start_month = st.selectbox(
+                "",
+                available_months,
+                index=available_months.index(st.session_state.start_month),
+                format_func=lambda x: datetime.strptime(x, "%Y_%m").strftime("%b %y"),
+                key="range_start",
+                label_visibility="collapsed"
+            )
+
+            # Clamp end to start if needed
+            if st.session_state.start_month > st.session_state.end_month:
+                st.session_state.end_month = st.session_state.start_month
+                st.rerun()
+
+            st.session_state.end_month = st.selectbox(
+                "",
+                available_months,
+                index=available_months.index(st.session_state.end_month),
+                format_func=lambda x: datetime.strptime(x, "%Y_%m").strftime("%b %y"),
+                key="range_end",
+                label_visibility="collapsed"
+            )
+
+
+            
+
+            mode_label = "Switch to Total" if st.session_state.range_mode == "avg" else "Switch to Average"
+            if st.button(mode_label, key="btn_range_mode", use_container_width=True):
+                st.session_state.range_mode = "total" if st.session_state.range_mode == "avg" else "avg"
+                st.rerun()
+            if st.session_state.start_month > st.session_state.end_month:
+                st.warning("Start must be before end.")
+        else:
+            st.markdown("Only one month available.")
 
 with col_targ:
     st.markdown("<div style='margin-top:0.8rem;'></div>", unsafe_allow_html=True)
@@ -216,7 +292,7 @@ ui_target_pct = st.session_state.target_pct
 
 target     = round(current * (1 + TARGET_GROWTH_PCT))
 gap        = target - current
-all_levers = rank_opportunities(st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, IMPROVEMENT_PCT)
+all_levers = rank_opportunities(_active_presses, reduction_pct=IMPROVEMENT_PCT)
 
 # ── KPI STRIP ─────────────────────────────────────────────────────────────
 k1, k2, k3 = st.columns(3)
@@ -258,7 +334,7 @@ if q5.button("Reset", key="btn_reset",use_container_width=True):
 if st.session_state.question == "backward":
     st.markdown("<hr>", unsafe_allow_html=True)
 
-    plan = what_would_it_take(target, st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, IMPROVEMENT_PCT)
+    plan = what_would_it_take(_active_presses,target, reduction_pct=IMPROVEMENT_PCT)
 
     _, col_status, _ = st.columns([1, 4, 1])
 
@@ -266,7 +342,7 @@ if st.session_state.question == "backward":
     st.markdown(
             """
             <div style="margin-top: -2rem; margin-bottom: 1rem; font-size: 0.9rem; color: #9CA3AF; text-align: left;">
-                <i>All items show 20% improvement to hit +10% target</i>
+                <i>All items show 20% improvement to hit target</i>
             </div>
             """, 
             unsafe_allow_html=True
@@ -286,13 +362,14 @@ if st.session_state.question == "backward":
         total_shifts = cfg.get("total_shifts", 0)
 
         # makeready is now a standard downtime lever -- read it the same way
-        baseline = DEFAULT_DOWNTIME_CONFIG[lev["press"]].get(lev["category"], 0)
-            
+        baseline = DEFAULT_DOWNTIME_CONFIG[lev["press"]].get(lev["category"], 0)   
         target_hrs = round(baseline - lev["hours_saved"], 1)
         mps_str    = fmt_mps(baseline, p_cfg)
         is_top     = (i == 0)
         card_class = "lever-card top" if is_top else "lever-card"
 
+        
+        
         reduction_display = int(lev['reduction_pct'] * 100)
         hrs = lev.get('hours_saved', 0)
         
@@ -303,8 +380,8 @@ if st.session_state.question == "backward":
             target_mps_val  = current_mps_val * (1 - lev['reduction_pct'])
             
             # Format for display
-            current_mps_str = f"{int(current_mps_val)}m"
-            target_mps_str  = f"{int(target_mps_val)}m"
+            current_mps_str = fmt_duration(current_mps_val)
+            target_mps_str  = fmt_duration(target_mps_val)
             card_html = (
                 f'<div style="padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid #2D3748; '
                 f'border-left: 4px solid {border_color}; background: #1E293B; margin-bottom: 0.75rem; '
@@ -428,7 +505,7 @@ elif st.session_state.question == "losses":
             st.rerun()
 
     # ── DATA PREPARATION ────────────────────────────────────────────────
-    levers_raw = rank_opportunities(st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, reduction_pct=1.0)
+    levers_raw = rank_opportunities(_active_presses, reduction_pct=1.0)
     levers_full = [l for l in levers_raw if l["category"] != "speed"]
     
     # Apply Grouping Logic if toggle is active
@@ -542,7 +619,7 @@ elif st.session_state.question == "plan":
         m_gain, m_used, m_saved = 0, 0, 0
         for p in p_list:
             already = claimed.get(p, 0)
-            impact = lever_impact(p, move["category"], move["pct"] / 100, st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, hours_already_claimed=already)
+            impact = lever_impact(_active_presses,p, move["category"], move["pct"] / 100, hours_already_claimed=already)
             claimed[p] = already + impact["hours_used"]
             m_gain += impact["sheets_gained"]; m_used += impact["hours_used"]; m_saved += impact["hours_saved"]
             
@@ -568,12 +645,41 @@ elif st.session_state.question == "plan":
     p_list_prev = list(st.session_state.press_config.keys()) if add_press == "All" else [add_press]
     p_gain, p_hrs, p_save = 0, 0, 0
     for p in p_list_prev:
-        impact = lever_impact(p, add_cat, add_pct/100, st.session_state.press_config, DEFAULT_DOWNTIME_CONFIG, hours_already_claimed=claimed.get(p, 0))
+        impact = lever_impact(_active_presses,p, add_cat, add_pct/100, hours_already_claimed=claimed.get(p, 0))
         p_gain += impact["sheets_gained"]; p_hrs += impact["hours_used"]; p_save += impact["hours_saved"]
     
     with col_prev:
         warn_msg = f"<span style='color:{C_ALERT};font-size:0.85rem;margin-left:0.4rem;' title='Clipped'>⚠</span>" if p_hrs < p_save and add_cat != "speed" else ""
-        st.markdown(f'<div style="margin-top:1.73rem;background:{C_MID};border:1px solid #4B5563;border-radius:4px;padding:0.65rem 0.5rem;display:flex;justify-content:center;align-items:center;line-height:1.2;"><span style="font-size:0.85rem;color:{C_MUTED};text-transform:uppercase;letter-spacing:0.05em;margin-right:0.6rem;">Sheets:</span><span style="font-family:\'IBM Plex Mono\',monospace;color:{C_OK};font-size:1.05rem;font-weight:700;">+{fmt_k(p_gain)}</span>{warn_msg}</div>', unsafe_allow_html=True)
+        # Calculate preview shift duration
+        if add_cat != "speed" and p_list_prev:
+            pb_hrs, pb_shifts = 0, 0
+            for p in p_list_prev:
+                p_cfg = st.session_state.press_config[p]
+                pb_shifts += p_cfg.get("total_shifts", 0)
+                pb_hrs += DEFAULT_DOWNTIME_CONFIG[p].get(add_cat, 0)
+            prev_m_str = f"{fmt_duration((pb_hrs*60)/pb_shifts)} → {fmt_duration(((pb_hrs-p_hrs)*60)/pb_shifts)}" if pb_shifts > 0 else ""
+        else:
+            prev_m_str = ""
+        st.markdown(
+        f'<div style="margin-top:1.73rem;background:{C_MID};border:1px solid #4B5563;border-radius:4px;'
+        f'padding:0.65rem 0.5rem;display:flex;justify-content:center;align-items:center;gap:0.8rem;line-height:1.2;">'
+        f'<div style="text-align:center;">'
+        f'<span style="font-family:\'IBM Plex Mono\',monospace;color:{C_OK};font-size:1.05rem;font-weight:700;">+{fmt_k(p_gain)}</span>'
+        f'{warn_msg}'
+        f'</div>'
+        + (
+            f'<div style="text-align:center;border-left:1px solid #4B5563;padding-left:0.8rem;">'
+            f'<span style="font-size:0.78rem;color:{C_MUTED};">{prev_m_str}</span>'
+            f'</div>'
+            if prev_m_str else ''
+        )
+        + f'</div>',
+        unsafe_allow_html=True
+    )
+
+
+
+
 
     with col_add:
         st.markdown("<div style='margin-top:1.73rem;'></div>", unsafe_allow_html=True)
@@ -640,7 +746,8 @@ elif st.session_state.question == "plan":
             p_ids = list(st.session_state.press_config.keys()) if r['press'] == "All" else [r['press']]
             if r["category"] == "speed":
                 avg_sph = sum(st.session_state.press_config[p].get("effective_sph", 0) for p in p_ids) / len(p_ids)
-                m_str = f"{int(avg_sph):,} -> {int(avg_sph*(1+r['pct']/100)):,} SPH"
+                m_str = m_str = f"{fmt_duration((b_hrs*60)/b_shifts)} -> {fmt_duration(((b_hrs-r['hours_used'])*60)/b_shifts)}" if b_shifts > 0 else "0m"
+
             else:
                 b_hrs, b_shifts = 0, 0
                 for p in p_ids:
@@ -648,7 +755,8 @@ elif st.session_state.question == "plan":
                     n_s = p_cfg.get("total_shifts", 0)
                     b_shifts += n_s
                     b_hrs += DEFAULT_DOWNTIME_CONFIG[p].get(r["category"], 0)
-                m_str = f"{int((b_hrs*60)/b_shifts)}m -> {int(((b_hrs-r['hours_used'])*60)/b_shifts)}m" if b_shifts > 0 else "0m"
+                m_str = m_str = f"{fmt_duration((b_hrs*60)/b_shifts)} -> {fmt_duration(((b_hrs-r['hours_used'])*60)/b_shifts)}" if b_shifts > 0 else "0m"
+
 
             col_txt, col_del = st.columns([15, 1])
             with col_txt: st.markdown(f'<div style="font-size:0.85rem;color:{C_MUTED};display:flex;align-items:center;gap:10px;padding-top:0.3rem;"><div style="width:10px;height:10px;background:{bar_colors_list[i % len(bar_colors_list)]};border-radius:2px;"></div><span style="color:{C_WHITE};font-weight:600;">{display_p}</span><span>{label}</span><span style="margin-left:auto;font-family:\'IBM Plex Mono\';color:{C_OK};font-weight:600;">+{fmt_k(r["sheets_gained"])}</span><span style="opacity:0.7;font-size:0.8rem;margin-left:10px;">({m_str})</span></div>', unsafe_allow_html=True)
@@ -684,7 +792,7 @@ elif st.session_state.question == "deep_dive":
     # Per-code detail now comes from real parsed data via the adapter,
     # not the old hardcoded DOWNTIME_CODE_MAP / CODE_HOUR_SPLITS.
     from floorplan_calculator import code_breakdown
-    code_rows = code_breakdown(reduction_pct=1.0)
+    code_rows = code_breakdown(_active_presses,reduction_pct=1.0)
 
     df_rows = []
     active_press = st.session_state.dd_filter_press
@@ -708,7 +816,7 @@ elif st.session_state.question == "deep_dive":
             "Overall": LEVER_LABELS.get(r["category"], r["category"]),
             "Sheets Lost": int(r["sheets_lost"]),
             "Hours Lost": r["hours_lost"],
-            "Mins/Shift": int(r["mins_shift"]),
+            "Mins/Shift": fmt_duration(r["mins_shift"]),
         })
 
     if st.session_state.dd_group_mode == "by_press":
@@ -726,7 +834,7 @@ elif st.session_state.question == "deep_dive":
         
         df_rows = []
         for row in grouped.values():
-            row["Mins/Shift"] = int((row["Hours Lost"] * 60) / row["_shifts"]) if row["_shifts"] > 0 else 0
+            row["Mins/Shift"] = fmt_duration((row["Hours Lost"] * 60) / row["_shifts"]) if row["_shifts"] > 0 else "0m"
             del row["_shifts"]
             df_rows.append(row)
         df_rows.sort(key=lambda x: x["Sheets Lost"], reverse=True)
@@ -748,20 +856,25 @@ elif st.session_state.question == "deep_dive":
         
         df_rows = []
         for row in grouped.values():
-            row["Mins/Shift"] = int((row["Hours Lost"] * 60) / total_fleet_shifts) if total_fleet_shifts > 0 else 0
+            row["Mins/Shift"] = fmt_duration((row["Hours Lost"] * 60) / total_fleet_shifts) if total_fleet_shifts > 0 else "0m"
             df_rows.append(row)
         df_rows.sort(key=lambda x: x["Sheets Lost"], reverse=True)
 
 
+
+    # Apply pandas styling to center the text in the cells and headers
+    df = pd.DataFrame(df_rows).sort_values(by="Sheets Lost", ascending=False)
+    styled_df = df.style.set_properties(**{'text-align': 'center'}) \
+                        .set_table_styles([{'selector': 'th', 'props': [('text-align', 'center')]}])
 
     st.dataframe(
         pd.DataFrame(df_rows).sort_values(by="Sheets Lost", ascending=False),
         use_container_width=True,
         hide_index=True,
         column_config={
-            "Press": st.column_config.TextColumn("Press",width="small"),
-            "Overall": st.column_config.TextColumn("Category",width="small"),
-            "Reason": st.column_config.TextColumn("Code",width="small"),
+            "Press": st.column_config.TextColumn("Press", width="small", alignment="center"),
+            "Overall": st.column_config.TextColumn("Category", width="small", alignment="center"),
+            "Reason": st.column_config.TextColumn("Code", width="small", alignment="center"),
             "Sheets Lost": st.column_config.ProgressColumn(
                 "Sheet Loss",
                 format="%,.0f",
@@ -769,8 +882,8 @@ elif st.session_state.question == "deep_dive":
                 max_value=max([r["Sheets Lost"] for r in df_rows]) if df_rows else 1,
                 width="large"
             ),
-            "Hours Lost": st.column_config.NumberColumn("Hrs/Mo", format="%.1f hrs",),
-            "Mins/Shift": st.column_config.NumberColumn("Min/Shift", format="%d min"),
+            "Hours Lost": st.column_config.NumberColumn("Hrs/Mo", format="%.1f hrs", alignment="center"),
+            "Mins/Shift": st.column_config.TextColumn("Per Shift", width="small", alignment="center"),
         }
     )
 
@@ -779,7 +892,7 @@ elif st.session_state.question == "deep_dive":
     from floorplan_calculator import code_labels_by_category
     with st.expander("Downtime Reason Code Reference", expanded=False):
         map_cols = st.columns(4)
-        for i, (cat_key, codes) in enumerate(code_labels_by_category().items()):
+        for i, (cat_key, codes) in enumerate(code_labels_by_category(_active_presses).items()):
             with map_cols[i % 4]:
                 st.markdown(f"""
                     <div style="background:{C_MID}; padding:0.8rem; border-radius:4px; border-left:3px solid {C_ACCENT}; margin-bottom:0.8rem; min-height:85px;">
@@ -793,3 +906,29 @@ elif st.session_state.question == "deep_dive":
 # ── FOOTER ────────────────────────────────────────────────────────────────
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(f"<div style='color:{C_MUTED};font-size:0.7rem;'>FloorPlan v1.0 · RRD Press Room · Calibrated Q1–Apr 2026 · Fleet accuracy -2.1% vs actual</div>", unsafe_allow_html=True)
+from floorplan_calculator import _PRESS_BY_ID
+from calculations.baseline import available_hours, running_speed_net
+
+with st.expander("🔧 Debug: Raw Press Metrics", expanded=False):
+    debug_rows = []
+    active_by_id = {p.press_id: p for p in _active_presses}
+    for p_id, cfg in st.session_state.press_config.items():
+        press = active_by_id.get(p_id)
+        if not press:
+            continue
+        debug_rows.append({
+            "Press":          p_id,
+            "Net Sheets":     press.net_sheets,
+            "Gross Sheets":   press.gross_sheets,
+            "Run Hrs":        press.actual_run_hrs,
+            "Logged Hrs":     press.total_logged_hrs,
+            "Available Hrs":  round(available_hours(press), 1),
+            "No Crew Hrs":    press.no_crew_hrs,
+            "Planned Maint":  press.planned_maintenance_hrs,
+            "Total Shifts":   press.total_shifts,
+            "Job Count":      press.job_count,
+            "Running Speed":  round(running_speed_net(press), 1),
+            "Downtime Hrs":   round(sum(press.downtime_by_lever.values()), 1),
+        })
+    st.dataframe(pd.DataFrame(debug_rows), hide_index=True, use_container_width=True)
+

@@ -40,6 +40,7 @@ class Press:
                                          # keys match LEVERS in config/op_codes.py
     downtime_by_code: dict               # {"2070": {"hours": 12.4, "name": "Jam"}, ...}
                                          # raw per-op-code detail for the deep-dive view
+    job_count: int = 0
 
     def __post_init__(self):
         """Validate that inputs make physical sense. Raises ValueError on bad data."""

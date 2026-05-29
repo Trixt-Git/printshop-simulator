@@ -39,39 +39,190 @@ from calculations.fleet import summarize_fleet
 
 _HERE     = os.path.dirname(os.path.abspath(__file__))
 _DATA_DIR = os.path.join(_HERE, "data")
+MIN_MAKEREADY_MINS = 60
 
+def _average_presses(all_months: list[list]) -> list:
+    """
+    Take a list of monthly Press lists, return one averaged Press per press.
+    Raw fields are summed across months then divided by month count.
+    Ratios and derived metrics are never averaged directly.
+    """
+    from models.press import Press
+    
+    if not all_months:
+        raise ValueError("No monthly data to average.")
+    
+    n_months = len(all_months)
+    
+    # Flatten into per-press buckets: 
+    by_press = {}
+    for month in all_months:
+        for press in month:
+            by_press.setdefault(press.press_id, []).append(press)
+    
+    averaged = []
+    for press_id, months in by_press.items():
+        n = len(months)  # may be < n_months if press was idle some months
+        
+        # Sum all raw fields
+        net_sheets              = sum(p.net_sheets for p in months)
+        gross_sheets            = sum(p.gross_sheets for p in months)
+        actual_run_hrs          = sum(p.actual_run_hrs for p in months)
+        total_logged_hrs        = sum(p.total_logged_hrs for p in months)
+        no_crew_hrs             = sum(p.no_crew_hrs for p in months)
+        planned_maintenance_hrs = sum(p.planned_maintenance_hrs for p in months)
+        total_shifts            = sum(p.total_shifts for p in months)
+        job_count               = sum(p.job_count for p in months)
 
-def _find_csv(env_var, pattern):
-    """Resolve a CSV path: env var wins; else newest match in data/."""
-    # 1. Explicit env var always wins
-    env_path = os.environ.get(env_var)
-    if env_path:
-        if not os.path.exists(env_path):
-            raise FileNotFoundError(f"{env_var} set to '{env_path}' but no file there.")
-        return env_path
-    # 2. Search the data/ folder for the pattern
-    matches = sorted(glob.glob(os.path.join(_DATA_DIR, pattern)))
-    if matches:
-        if len(matches) >1:
-            names= ", ".join(os.path.basename(m) for m in matches)
-            print(f"[INFO] {len(matches)} files. match '{pattern}: {names}."
-                  f"Loading newest only {os.path.basename(matches[-1])}")
-        return matches[-1]   # YYYY_MM names sort chronologically -> newest last
-    # 3. Nothing found -- fail loud, say exactly where we looked
-    raise FileNotFoundError(
-        f"No file matching '{pattern}' in {_DATA_DIR}. "
-        f"Put your monthly CSV there or set {env_var}."
-    )
+        # Sum downtime_by_lever
+        downtime_by_lever = {}
+        for p in months:
+            for cat, hrs in p.downtime_by_lever.items():
+                downtime_by_lever[cat] = downtime_by_lever.get(cat, 0.0) + hrs
 
+        # Sum downtime_by_code
+        downtime_by_code = {}
+        for p in months:
+            for code, d in p.downtime_by_code.items():
+                if code not in downtime_by_code:
+                    downtime_by_code[code] = {"hours": 0.0, "name": d["name"]}
+                downtime_by_code[code]["hours"] += d["hours"]
 
-_CSV         = _find_csv("FLOORPLAN_CSV",         "productivity_*.csv")
-_MACHINE_LOG = _find_csv("FLOORPLAN_MACHINE_LOG", "productionlog_*.csv")
+        # Divide raw fields by number of months this press appeared in
+        averaged.append(Press(
+            press_id                = press_id,
+            period_start            = min(p.period_start for p in months),
+            period_end              = max(p.period_end for p in months),
+            net_sheets              = round(net_sheets / n),
+            gross_sheets            = round(gross_sheets / n),
+            actual_run_hrs          = round(actual_run_hrs / n, 2),
+            total_logged_hrs        = round(total_logged_hrs / n, 2),
+            no_crew_hrs             = round(no_crew_hrs / n, 2),
+            planned_maintenance_hrs = round(planned_maintenance_hrs / n, 2),
+            total_shifts            = round(total_shifts / n),
+            downtime_by_lever       = {k: round(v / n, 2) for k, v in downtime_by_lever.items()},
+            downtime_by_code        = {code: {"hours": round(d["hours"] / n, 2), "name": d["name"]}
+                                       for code, d in downtime_by_code.items()},
+            job_count               = round(job_count/n),
+        ))
 
+    return sorted(averaged, key=lambda p: p.press_id)
 
+# ---------------------------------------------------------------------------
+# Data loading -- CSV locally, snapshot on Streamlit Cloud
+# ---------------------------------------------------------------------------
 
-_parser  = ProductivityCSVParser()
-_PRESSES = _parser.parse(_CSV, _MACHINE_LOG)
+_USE_SNAPSHOT = not os.path.isdir(_DATA_DIR) or not any(
+    f.startswith("productivity_") and f.endswith(".csv")
+    for f in os.listdir(_DATA_DIR)
+    if os.path.isfile(os.path.join(_DATA_DIR, f))
+)
+
+if _USE_SNAPSHOT:
+    from parsers.snapshot_reader import load_snapshot
+    print("[INFO] No CSVs found — loading from snapshot.json")
+    _ALL_MONTHS_BY_PERIOD = load_snapshot()
+else:
+    _parser     = ProductivityCSVParser()
+    _all_months = []
+    for _prod_file in sorted(glob.glob(os.path.join(_DATA_DIR, "productivity_*.csv"))):
+        _log_pattern = _prod_file.replace("productivity_", "productionlog_")
+        _log_file    = _log_pattern if os.path.exists(_log_pattern) else None
+        _all_months.append(_parser.parse(_prod_file, _log_file))
+
+    if not _all_months:
+        raise FileNotFoundError(f"No productivity_*.csv files found in {_DATA_DIR}")
+
+    print(f"[INFO] Loaded {len(_all_months)} month(s): "
+          + ", ".join(os.path.basename(f) for f in sorted(glob.glob(os.path.join(_DATA_DIR, "productivity_*.csv")))))
+
+    _ALL_MONTHS_BY_PERIOD = {}
+    for _month_list in _all_months:
+        if _month_list:
+            _period = _month_list[0].period_start.strftime("%Y_%m")
+            _ALL_MONTHS_BY_PERIOD[_period] = _month_list
+
+_PRESSES     = _average_presses(list(_ALL_MONTHS_BY_PERIOD.values()))
 _PRESS_BY_ID = {p.press_id: p for p in _PRESSES}
+
+# ---------------------------------------------------------------------------
+# Month range support
+# ---------------------------------------------------------------------------
+
+_ALL_MONTHS_BY_PERIOD = {}
+for _month_list in _all_months:
+    if _month_list:
+        _period = _month_list[0].period_start.strftime("%Y_%m")
+        _ALL_MONTHS_BY_PERIOD[_period] = _month_list
+
+def get_available_months() -> list[str]:
+    """Returns sorted list of available month keys e.g. ['2026_01', '2026_04']"""
+    return sorted(_ALL_MONTHS_BY_PERIOD.keys())
+
+def load_range(start: str, end: str) -> list:
+    """
+    Return averaged Press list for months between start and end inclusive.
+    start/end are 'YYYY_MM' strings.
+    """
+    filtered = [
+        month_list
+        for period, month_list in _ALL_MONTHS_BY_PERIOD.items()
+        if start <= period <= end
+    ]
+    if not filtered:
+        raise ValueError(f"No data found between {start} and {end}")
+    return _average_presses(filtered)
+
+def load_total(start: str, end: str) -> list:
+    """
+    Return summed (not averaged) Press list for months between start and end.
+    Use for period totals rather than monthly averages.
+    """
+    from models.press import Press
+
+    filtered = [
+        month_list
+        for period, month_list in _ALL_MONTHS_BY_PERIOD.items()
+        if start <= period <= end
+    ]
+    if not filtered:
+        raise ValueError(f"No data found between {start} and {end}")
+
+    by_press = {}
+    for month_list in filtered:
+        for press in month_list:
+            by_press.setdefault(press.press_id, []).append(press)
+
+    totals = []
+    for press_id, months in by_press.items():
+        totals.append(Press(
+            press_id                = press_id,
+            period_start            = min(p.period_start for p in months),
+            period_end              = max(p.period_end for p in months),
+            net_sheets              = sum(p.net_sheets for p in months),
+            gross_sheets            = sum(p.gross_sheets for p in months),
+            actual_run_hrs          = round(sum(p.actual_run_hrs for p in months), 2),
+            total_logged_hrs        = round(sum(p.total_logged_hrs for p in months), 2),
+            no_crew_hrs             = round(sum(p.no_crew_hrs for p in months), 2),
+            planned_maintenance_hrs = round(sum(p.planned_maintenance_hrs for p in months), 2),
+            total_shifts            = sum(p.total_shifts for p in months),
+            job_count               = sum(p.job_count for p in months),
+            downtime_by_lever       = {
+                k: round(sum(p.downtime_by_lever.get(k, 0) for p in months), 2)
+                for k in months[0].downtime_by_lever
+            },
+            downtime_by_code        = {
+                code: {
+                    "hours": round(sum(p.downtime_by_code.get(code, {}).get("hours", 0) for p in months), 2),
+                    "name": detail["name"]
+                }
+                for code, detail in months[0].downtime_by_code.items()
+            },
+        ))
+
+    return sorted(totals, key=lambda p: p.press_id)
+
+
 
 # UI lever keys -> new package lever keys.
 # The UI uses "quality_approval"/"manager_approval"; the package uses
@@ -86,6 +237,10 @@ _UI_TO_PKG = {
     "makeready":        "makeready",
 }
 _PKG_TO_UI = {v: k for k, v in _UI_TO_PKG.items()}
+
+# Standard Makeready Mins
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -139,14 +294,14 @@ def _press(press_id):
 # fleet_summary -- matches old return shape
 # ---------------------------------------------------------------------------
 
-def fleet_summary(press_config=None, downtime_config=None,
+def fleet_summary(presses,press_config=None, downtime_config=None,
                   planned_maintenance=None) -> dict:
     """
     Fleet rollup in the shape the UI expects.
     press_config / downtime_config are accepted for signature compatibility
     but the real data comes from the parsed Press objects.
     """
-    summary = summarize_fleet(_PRESSES)
+    summary = summarize_fleet(presses)
 
     by_press = {}
     for s in summary.by_press:
@@ -177,15 +332,24 @@ def fleet_summary(press_config=None, downtime_config=None,
 # lever_impact -- matches old return shape
 # ---------------------------------------------------------------------------
 
-def lever_impact(press_id, category, reduction_pct,
-                 press_config=None, downtime_config=None,
-                 hours_already_claimed=0) -> dict:
+def lever_impact(presses, press_id, category, reduction_pct,
+               press_config=None, downtime_config=None,
+               hours_already_claimed=0) -> dict:
+    """
+    Sheet impact of reducing one lever by reduction_pct.
+    hours_already_claimed is accepted for signature compatibility but ignored.
+    """
+    press_by_id = {p.press_id: p for p in presses}
+    if press_id not in press_by_id:
+        raise KeyError(f"Unknown press id: {press_id}")
+    press = press_by_id[press_id]
+
+
     """
     Sheet impact of reducing one lever by reduction_pct.
     hours_already_claimed is accepted for signature compatibility but ignored --
     headroom logic was removed (lever hours are self-limiting, decision D7).
     """
-    press = _press(press_id)
 
     # SPEED -- synthetic UI lever. Increases yield of existing run hours.
     if category == "speed":
@@ -204,13 +368,22 @@ def lever_impact(press_id, category, reduction_pct,
 
     # Standard levers -- route through the audited package
     pkg_lever = _UI_TO_PKG.get(category, category)
-    result = _lever_impact(press, pkg_lever, reduction_pct)
 
-    avail = available_hours(press)
-    oee_gained = (
-        round((result.hours_recovered / avail) * oee_quality(press) * 100, 2)
-        if avail > 0 else 0
-    )
+    # Makeready floor -- we can't reduce below MIN_MAKEREADY_MINS per job
+    if pkg_lever == "makeready" and press.job_count > 0:
+        floor_hrs = (press.job_count * MIN_MAKEREADY_MINS) / 60
+        available_makeready = max(0, press.downtime_by_lever.get("makeready", 0) - floor_hrs)
+        from models.press import Press as _Press
+        import dataclasses
+        press = dataclasses.replace(
+            press,
+            downtime_by_lever={
+                **press.downtime_by_lever,
+                "makeready": available_makeready
+            }
+        )
+
+    result = _lever_impact(press, pkg_lever, reduction_pct)
 
     return {
         "press":          press_id,
@@ -220,7 +393,7 @@ def lever_impact(press_id, category, reduction_pct,
         "hours_saved":    result.hours_recovered,
         "hours_used":     result.hours_recovered,
         "sheets_gained":  result.sheets_gained,
-        "oee_pts_gained": oee_gained,
+        
     }
 
 
@@ -228,16 +401,16 @@ def lever_impact(press_id, category, reduction_pct,
 # rank_opportunities -- matches old return shape
 # ---------------------------------------------------------------------------
 
-def rank_opportunities(press_config=None, downtime_config=None,
+def rank_opportunities(presses,press_config=None, downtime_config=None,
                        reduction_pct: float = 0.20) -> list:
     """Rank every lever across the fleet by sheets gained, descending."""
     opportunities = []
-    for press in _PRESSES:
+    for press in presses:
         for pkg_lever in press.downtime_by_lever:
             if press.downtime_by_lever[pkg_lever] <= 0:
                 continue
             ui_cat = _PKG_TO_UI.get(pkg_lever, pkg_lever)
-            impact = lever_impact(press.press_id, ui_cat, reduction_pct)
+            impact = lever_impact(presses,press.press_id,ui_cat,reduction_pct)
             if impact["sheets_gained"] > 0:
                 opportunities.append(impact)
     return sorted(opportunities, key=lambda x: x["sheets_gained"], reverse=True)
@@ -247,18 +420,19 @@ def rank_opportunities(press_config=None, downtime_config=None,
 # what_would_it_take -- matches old return shape
 # ---------------------------------------------------------------------------
 
-def what_would_it_take(target_sheets: int, press_config=None,
+def what_would_it_take(presses,
+                       target_sheets: int, press_config=None,
                        downtime_config=None,
                        reduction_pct: float = 0.20) -> dict:
     """Backward engine -- rank levers and show the path to close the gap."""
-    fleet   = fleet_summary()
+    fleet   = fleet_summary(presses)
     current = fleet["total_reality"]
     gap     = max(0, target_sheets - current)
 
     if gap == 0:
         return {"message": "Already at or above target.", "gap": 0, "levers": []}
 
-    opportunities = rank_opportunities(reduction_pct=reduction_pct)
+    opportunities = rank_opportunities(presses, reduction_pct=reduction_pct)
     levers    = []
     remaining = gap
 
@@ -285,7 +459,7 @@ def what_would_it_take(target_sheets: int, press_config=None,
 # code_breakdown -- real per-op-code detail for the Deep Dive view
 # ---------------------------------------------------------------------------
 
-def code_breakdown(reduction_pct: float = 1.0) -> list:
+def code_breakdown(presses,reduction_pct: float = 1.0) -> list:
     """
     Per-op-code loss breakdown across the fleet, built from real parsed data.
     Replaces the UI's hardcoded CODE_HOUR_SPLITS / DOWNTIME_CODE_MAP.
@@ -302,7 +476,7 @@ def code_breakdown(reduction_pct: float = 1.0) -> list:
     reduction_pct 1.0 = full theoretical recovery (matches Deep Dive default).
     """
     rows = []
-    for press in _PRESSES:
+    for press in presses:
         speed  = running_speed_net(press)
         shifts = press.total_shifts
         for code, detail in press.downtime_by_code.items():
@@ -326,7 +500,7 @@ def code_breakdown(reduction_pct: float = 1.0) -> list:
     return sorted(rows, key=lambda r: r["sheets_lost"], reverse=True)
 
 
-def code_labels_by_category() -> dict:
+def code_labels_by_category(presses,) -> dict:
     """
     {ui_category: ["2070 - Jam / Trip", ...]} built from real parsed data.
     Replaces the UI's hardcoded DOWNTIME_CODE_MAP reference card.
@@ -334,7 +508,7 @@ def code_labels_by_category() -> dict:
     from config.op_codes import LEVER_CODE_TO_CATEGORY
     out = {}
     seen = set()
-    for press in _PRESSES:
+    for press in presses:
         for code, detail in press.downtime_by_code.items():
             if code in seen:
                 continue

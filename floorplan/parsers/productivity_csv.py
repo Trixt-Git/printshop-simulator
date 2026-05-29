@@ -116,8 +116,8 @@ class ProductivityCSVParser(ProductivityParser):
         period_start, period_end = _parse_period_from_filename(source)
         raw_rows   = self._read_and_deduplicate(source)
         press_data = self._aggregate(raw_rows)
-        shift_counts = self.parse_shifts(machine_log) if machine_log else {}
-        return self._build_presses(press_data, period_start, period_end, shift_counts)
+        shift_counts, job_counts = self.parse_shifts(machine_log) if machine_log else ({},{})
+        return self._build_presses(press_data, period_start, period_end, shift_counts,job_counts)
 
     # ------------------------------------------------------------------
     # Step 1 — Read and deduplicate
@@ -256,7 +256,7 @@ class ProductivityCSVParser(ProductivityParser):
     # ------------------------------------------------------------------
 
     def _build_presses(self, press_data: dict, period_start, period_end,
-                       shift_counts: dict = None) -> list[Press]:
+                       shift_counts: dict = None, job_counts:dict=None) -> list[Press]:
         """
         Convert aggregated dicts into frozen Press dataclass instances.
         Skips any press with zero run hours (no productive data found).
@@ -265,6 +265,7 @@ class ProductivityCSVParser(ProductivityParser):
         If not provided, total_shifts defaults to 0.
         """
         shift_counts = shift_counts or {}
+        job_counts = job_counts or {}
         presses = []
 
         for press_id, bucket in press_data.items():
@@ -287,6 +288,7 @@ class ProductivityCSVParser(ProductivityParser):
                 no_crew_hrs            = round(bucket["no_crew_hrs"], 2),
                 planned_maintenance_hrs= round(bucket["planned_maintenance_hrs"], 2),
                 total_shifts           = shift_counts.get(press_id, 0),
+                job_count              = job_counts.get(press_id, 0), 
                 downtime_by_lever      = {
                     k: round(v, 2)
                     for k, v in bucket["downtime_by_lever"].items()
@@ -304,37 +306,28 @@ class ProductivityCSVParser(ProductivityParser):
     # Step 4 — Parse shift counts from Machine Log (optional)
     # ------------------------------------------------------------------
 
-    def parse_shifts(self, machine_log_path) -> dict:
-        """
-        Read the Machine Log CSV and return shift counts per press.
+    def parse_shifts(self, machine_log_path) -> tuple[dict, dict]:
 
-        Shift classification:
-          Day shift:   07:00 – 18:59 → shift date = operation date
-          Night shift: 19:00 – 23:59 → shift date = operation date
-          Night shift: 00:00 – 06:59 → shift date = operation date - 1 day
-
-        A press worked a shift if at least one operation occurred in that window.
-        Returns dict of press_id -> int (total shifts in period).
-        """
         from datetime import timedelta
 
         machine_log_path = Path(machine_log_path)
         if not machine_log_path.exists():
-            print(f"[WARNING] Machine Log not found: {machine_log_path} — shifts will be 0")
-            return {}
+            print(f"[WARNING] Production Log not found: {machine_log_path} — shifts and jobs will be 0")
+            return {}, {}
 
-        # Col indices in Machine Log (verified May 2026)
         ML_MACHINE      = 7
-        ML_TIME         = 25   # operation start time HH:MM
-        ML_DATE         = 9    # operation date M/D/YYYY
-        ML_SHIFT_MARKER = 53   # "Shift total" on summary rows
-        ML_SHIFT_DATE   = 26   # shift start date (on first row of each shift)
+        ML_TIME         = 25
+        ML_SHIFT_MARKER = 53
+        ML_SHIFT_DATE   = 26
+        ML_ROW_TYPE     = 12
+        ML_JOB          = 13
 
         DAY_START   = 7
         NIGHT_START = 19
 
-        seen       = set()
-        shift_sets = {}   # press_id -> set of (shift_type, shift_date)
+        shift_sets   = {}
+        job_sets     = {}
+        current_machine = None
 
         with open(machine_log_path, newline="", encoding="utf-8-sig") as f:
             reader = csv.reader(f)
@@ -343,27 +336,30 @@ class ProductivityCSVParser(ProductivityParser):
                     continue
 
                 machine = row[ML_MACHINE].strip()
-                if machine not in MACHINE_MAP:
+                if machine in MACHINE_MAP:
+                    current_machine = MACHINE_MAP[machine]
+
+                if current_machine is None:
                     continue
 
-                # Only process shift total rows — they have the clean date + time
+                # Job rows
+                if row[ML_ROW_TYPE].strip() == "Job":
+                    job_str = row[ML_JOB].strip()
+                    job_num = job_str.split("-")[0].strip() if job_str else None
+                    if job_num:
+                        job_sets.setdefault(current_machine, set()).add(job_num)
+
+                # Shift total rows
                 if row[ML_SHIFT_MARKER].strip() != "Shift total":
                     continue
 
-                press_id   = MACHINE_MAP[machine]
+                press_id   = current_machine
                 shift_date = row[ML_SHIFT_DATE].strip()
                 time_str   = row[ML_TIME].strip()
 
-                # Skip rows with no shift date — duplicates
-                if not shift_date:
+                if not shift_date or not time_str:
                     continue
 
-                dedup_key = (press_id, shift_date, time_str)
-                if dedup_key in seen:
-                    continue
-                seen.add(dedup_key)
-
-                # Parse time and date
                 try:
                     hour = int(time_str.split(":")[0])
                     parts = shift_date.split("/")
@@ -371,17 +367,17 @@ class ProductivityCSVParser(ProductivityParser):
                 except (ValueError, IndexError):
                     continue
 
-                # Classify shift
                 if DAY_START <= hour < NIGHT_START:
                     shift_window = ("day", op_date)
                 elif hour >= NIGHT_START:
                     shift_window = ("night", op_date)
                 else:
-                    # 00:00-06:59 belongs to previous day's night shift
                     shift_window = ("night", op_date - timedelta(days=1))
 
-                if press_id not in shift_sets:
-                    shift_sets[press_id] = set()
-                shift_sets[press_id].add(shift_window)
+                shift_sets.setdefault(press_id, set()).add(shift_window)
 
-        return {press_id: len(windows) for press_id, windows in shift_sets.items()}
+        shift_counts = {pid: len(windows) for pid, windows in shift_sets.items()}
+        job_counts   = {pid: len(jobs) for pid, jobs in job_sets.items()}
+        return shift_counts, job_counts
+
+
