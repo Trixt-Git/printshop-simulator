@@ -39,7 +39,7 @@ from calculations.fleet import summarize_fleet
 
 _HERE     = os.path.dirname(os.path.abspath(__file__))
 _DATA_DIR = os.path.join(_HERE, "data")
-MIN_MAKEREADY_MINS = 60
+MIN_MAKEREADY_MINS = 30
 
 def _average_presses(all_months: list[list]) -> list:
     """
@@ -117,11 +117,13 @@ _USE_SNAPSHOT = not os.path.isdir(_DATA_DIR) or not any(
     for f in os.listdir(_DATA_DIR)
     if os.path.isfile(os.path.join(_DATA_DIR, f))
 )
+_ALL_MONTHS_BY_PERIOD = {}
 
 if _USE_SNAPSHOT:
     from parsers.snapshot_reader import load_snapshot
     print("[INFO] No CSVs found — loading from snapshot.json")
     _ALL_MONTHS_BY_PERIOD = load_snapshot()
+
 else:
     _parser     = ProductivityCSVParser()
     _all_months = []
@@ -145,15 +147,12 @@ else:
 _PRESSES     = _average_presses(list(_ALL_MONTHS_BY_PERIOD.values()))
 _PRESS_BY_ID = {p.press_id: p for p in _PRESSES}
 
+
+
 # ---------------------------------------------------------------------------
 # Month range support
 # ---------------------------------------------------------------------------
 
-_ALL_MONTHS_BY_PERIOD = {}
-for _month_list in _all_months:
-    if _month_list:
-        _period = _month_list[0].period_start.strftime("%Y_%m")
-        _ALL_MONTHS_BY_PERIOD[_period] = _month_list
 
 def get_available_months() -> list[str]:
     """Returns sorted list of available month keys e.g. ['2026_01', '2026_04']"""
@@ -237,6 +236,15 @@ _UI_TO_PKG = {
     "makeready":        "makeready",
 }
 _PKG_TO_UI = {v: k for k, v in _UI_TO_PKG.items()}
+
+def floored_makeready_hrs(press) -> float:
+    """Makeready hours after subtracting the per-job floor. Single source of truth."""
+    raw = press.downtime_by_lever.get("makeready", 0)
+    if press.job_count > 0:
+        floor_hrs = (press.job_count * MIN_MAKEREADY_MINS) / 60
+        return max(0, raw - floor_hrs)
+    return raw
+
 
 # Standard Makeready Mins
 
@@ -335,21 +343,10 @@ def fleet_summary(presses,press_config=None, downtime_config=None,
 def lever_impact(presses, press_id, category, reduction_pct,
                press_config=None, downtime_config=None,
                hours_already_claimed=0) -> dict:
-    """
-    Sheet impact of reducing one lever by reduction_pct.
-    hours_already_claimed is accepted for signature compatibility but ignored.
-    """
     press_by_id = {p.press_id: p for p in presses}
     if press_id not in press_by_id:
         raise KeyError(f"Unknown press id: {press_id}")
     press = press_by_id[press_id]
-
-
-    """
-    Sheet impact of reducing one lever by reduction_pct.
-    hours_already_claimed is accepted for signature compatibility but ignored --
-    headroom logic was removed (lever hours are self-limiting, decision D7).
-    """
 
     # SPEED -- synthetic UI lever. Increases yield of existing run hours.
     if category == "speed":
@@ -370,18 +367,16 @@ def lever_impact(presses, press_id, category, reduction_pct,
     pkg_lever = _UI_TO_PKG.get(category, category)
 
     # Makeready floor -- we can't reduce below MIN_MAKEREADY_MINS per job
-    if pkg_lever == "makeready" and press.job_count > 0:
-        floor_hrs = (press.job_count * MIN_MAKEREADY_MINS) / 60
-        available_makeready = max(0, press.downtime_by_lever.get("makeready", 0) - floor_hrs)
-        from models.press import Press as _Press
+    if pkg_lever == "makeready":
         import dataclasses
         press = dataclasses.replace(
             press,
             downtime_by_lever={
                 **press.downtime_by_lever,
-                "makeready": available_makeready
+                "makeready": floored_makeready_hrs(press)
             }
         )
+
 
     result = _lever_impact(press, pkg_lever, reduction_pct)
 
@@ -481,7 +476,7 @@ def code_breakdown(presses,reduction_pct: float = 1.0) -> list:
         shifts = press.total_shifts
         for code, detail in press.downtime_by_code.items():
             from config.op_codes import LEVER_CODE_TO_CATEGORY
-            pkg_cat = LEVER_CODE_TO_CATEGORY.get(code)
+            pkg_cat = LEVER_CODE_TO_CATEGORY.get(code) or "unknown"
             ui_cat  = _PKG_TO_UI.get(pkg_cat, pkg_cat)
 
             hours_lost  = detail["hours"] * reduction_pct
@@ -513,7 +508,7 @@ def code_labels_by_category(presses,) -> dict:
             if code in seen:
                 continue
             seen.add(code)
-            pkg_cat = LEVER_CODE_TO_CATEGORY.get(code)
+            pkg_cat = LEVER_CODE_TO_CATEGORY.get(code) or "unknown"
             ui_cat  = _PKG_TO_UI.get(pkg_cat, pkg_cat)
             out.setdefault(ui_cat, []).append(f"{code} - {detail['name']}")
     for cat in out:

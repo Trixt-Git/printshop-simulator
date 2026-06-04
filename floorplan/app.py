@@ -26,7 +26,11 @@ from floorplan_calculator import (
     get_available_months,
     load_range,
     load_total,
+    _UI_TO_PKG,
+    floored_makeready_hrs,
 )
+from floorplan_calculator import _PRESS_BY_ID
+from calculations.baseline import available_hours, running_speed_net
 
 
 # ── CONFIG ────────────────────────────────────────────────────────────────
@@ -295,9 +299,25 @@ gap        = target - current
 all_levers = rank_opportunities(_active_presses, reduction_pct=IMPROVEMENT_PCT)
 
 # ── KPI STRIP ─────────────────────────────────────────────────────────────
+# Anomaly check -- flag any press with unusually low available hours
+anomalies = []
+for press in _active_presses:
+    avail = available_hours(press)
+    if press.total_logged_hrs > 0 and avail / press.total_logged_hrs < 0.25:
+        anomalies.append(f"Press {press.press_id}")
+
+if anomalies:
+    st.warning(
+        f"⚠️ {', '.join(anomalies)} {'has' if len(anomalies) == 1 else 'have'} unusually low available hours "
+        f"in the selected range — results may not reflect normal capacity. "
+        f"Check for planned shutdowns or extended no-crew periods."
+    )
+
+
+
 k1, k2, k3 = st.columns(3)
 with k1:
-    st.markdown(f'<div class="kpi-block"><div class="kpi-label">Monthly Output</div><div class="kpi-value">{fmt_k(current)}</div><div class="kpi-sub">sheets produced</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-block"><div class="kpi-label">Output</div><div class="kpi-value">{fmt_k(current)}</div><div class="kpi-sub">sheets produced</div></div>', unsafe_allow_html=True)
 with k2:
     st.markdown(f'<div class="kpi-block alert"><div class="kpi-label">Gap to Target</div><div class="kpi-value" style="color:{C_ALERT};">-{fmt_k(gap)}</div><div class="kpi-sub">+{ui_target_pct}% growth goal · target {fmt_k(target)}</div></div>', unsafe_allow_html=True)
 with k3:
@@ -573,7 +593,7 @@ elif st.session_state.question == "losses":
         textposition="auto",
         insidetextanchor="start",  # Anchors text to the left side of the bar
         textfont=dict(family="IBM Plex Sans", size=13, color=C_WHITE),
-        hovertemplate="<b>%{y}</b><br>+%{x:,.0f} sheets (100% recovery)<br>%{customdata[0]:.1f} hrs/month · <b>%{customdata[1]}</b><extra></extra>",
+        hovertemplate="<b>%{y}</b><br>+%{x:,.0f} sheets (100% recovery)<br>%{customdata[0]:.1f} Total Hrs · <b>%{customdata[1]}</b><extra></extra>",
         customdata=list(zip(bar_hrs, bar_mps)),
     ))
 
@@ -619,9 +639,12 @@ elif st.session_state.question == "plan":
         m_gain, m_used, m_saved = 0, 0, 0
         for p in p_list:
             already = claimed.get(p, 0)
-            impact = lever_impact(_active_presses,p, move["category"], move["pct"] / 100, hours_already_claimed=already)
+            impact = lever_impact(_active_presses, p, move["category"], move["pct"] / 100, hours_already_claimed=already)
             claimed[p] = already + impact["hours_used"]
-            m_gain += impact["sheets_gained"]; m_used += impact["hours_used"]; m_saved += impact["hours_saved"]
+            m_gain += impact["sheets_gained"]
+            m_used += impact["hours_used"]
+            m_saved += impact["hours_saved"]
+
             
         results.append({"press": move["press"], "category": move["category"], "pct": move["pct"], "sheets_gained": m_gain, "hours_used": m_used, "hours_saved": m_saved})
 
@@ -645,7 +668,7 @@ elif st.session_state.question == "plan":
     p_list_prev = list(st.session_state.press_config.keys()) if add_press == "All" else [add_press]
     p_gain, p_hrs, p_save = 0, 0, 0
     for p in p_list_prev:
-        impact = lever_impact(_active_presses,p, add_cat, add_pct/100, hours_already_claimed=claimed.get(p, 0))
+        impact = lever_impact(_active_presses, p, add_cat, add_pct/100, hours_already_claimed=claimed.get(p, 0))
         p_gain += impact["sheets_gained"]; p_hrs += impact["hours_used"]; p_save += impact["hours_saved"]
     
     with col_prev:
@@ -656,7 +679,10 @@ elif st.session_state.question == "plan":
             for p in p_list_prev:
                 p_cfg = st.session_state.press_config[p]
                 pb_shifts += p_cfg.get("total_shifts", 0)
-                pb_hrs += DEFAULT_DOWNTIME_CONFIG[p].get(add_cat, 0)
+                active_by_id = {pr.press_id: pr for pr in _active_presses}
+                pb_hrs += active_by_id[p].downtime_by_lever.get(_UI_TO_PKG.get(add_cat, add_cat), 0)
+
+
             prev_m_str = f"{fmt_duration((pb_hrs*60)/pb_shifts)} → {fmt_duration(((pb_hrs-p_hrs)*60)/pb_shifts)}" if pb_shifts > 0 else ""
         else:
             prev_m_str = ""
@@ -706,9 +732,17 @@ elif st.session_state.question == "plan":
             b_hrs, b_shifts = 0, 0
             for p in p_ids:
                 p_cfg = st.session_state.press_config[p]
-                n_s = p_cfg.get("total_shifts", 0)
-                b_shifts += n_s
-                b_hrs += DEFAULT_DOWNTIME_CONFIG[p].get(r["category"], 0)
+                active_by_id = {pr.press_id: pr for pr in _active_presses}
+                b_shifts += active_by_id[p].total_shifts
+
+                active_by_id = {pr.press_id: pr for pr in _active_presses}
+                pkg_cat = _UI_TO_PKG.get(r["category"], r["category"])
+                if pkg_cat == "makeready":
+                    b_hrs += floored_makeready_hrs(active_by_id[p])
+                else:
+                    b_hrs += active_by_id[p].downtime_by_lever.get(pkg_cat, 0)
+
+
             detail_str = f"{int((b_hrs*60)/b_shifts)}m -> {int(((b_hrs-r['hours_used'])*60)/b_shifts)}m" if b_shifts > 0 else "0m"
 
         full_info = f"{display_press} | {label} | +{fmt_k(r['sheets_gained'])} | {detail_str}"
@@ -752,9 +786,13 @@ elif st.session_state.question == "plan":
                 b_hrs, b_shifts = 0, 0
                 for p in p_ids:
                     p_cfg = st.session_state.press_config[p]
-                    n_s = p_cfg.get("total_shifts", 0)
-                    b_shifts += n_s
-                    b_hrs += DEFAULT_DOWNTIME_CONFIG[p].get(r["category"], 0)
+                    active_by_id = {pr.press_id: pr for pr in _active_presses}
+                    b_shifts += active_by_id[p].total_shifts
+
+                    active_by_id = {pr.press_id: pr for pr in _active_presses}
+                    b_hrs += active_by_id[p].downtime_by_lever.get(_UI_TO_PKG.get(r["category"], r["category"]), 0)
+
+
                 m_str = m_str = f"{fmt_duration((b_hrs*60)/b_shifts)} -> {fmt_duration(((b_hrs-r['hours_used'])*60)/b_shifts)}" if b_shifts > 0 else "0m"
 
 
@@ -825,8 +863,9 @@ elif st.session_state.question == "deep_dive":
             p = r["Press"]
             if p not in grouped:
                 p_id = p.replace("Press ", "")
-                p_cfg = st.session_state.press_config[p_id]
-                n_s = p_cfg.get("total_shifts", 0)
+                active_by_id = {pr.press_id: pr for pr in _active_presses}
+                n_s = active_by_id[p_id].total_shifts if p_id in active_by_id else 0
+
                 grouped[p] = {"Press": p, "Reason": "All categories", "Overall": "—", 
                             "Sheets Lost": 0, "Hours Lost": 0.0, "_shifts": n_s}
             grouped[p]["Sheets Lost"] += r["Sheets Lost"]
@@ -841,10 +880,7 @@ elif st.session_state.question == "deep_dive":
 
 
     elif st.session_state.dd_group_mode == "by_code":
-        total_fleet_shifts = sum(
-            cfg.get("total_shifts", 0)
-            for cfg in st.session_state.press_config.values()
-        )
+        total_fleet_shifts = sum(p.total_shifts for p in _active_presses)
         grouped = {}
         for r in df_rows:
             key = r["Reason"]
@@ -862,13 +898,20 @@ elif st.session_state.question == "deep_dive":
 
 
 
-    # Apply pandas styling to center the text in the cells and headers
+    # 1. Build and style the DataFrame cleanly using variables (no line-continuation backslashes)
     df = pd.DataFrame(df_rows).sort_values(by="Sheets Lost", ascending=False)
-    styled_df = df.style.set_properties(**{'text-align': 'center'}) \
-                        .set_table_styles([{'selector': 'th', 'props': [('text-align', 'center')]}])
+    
+    styled_df = (
+        df.style
+        .set_properties(text_align='center')
+        .set_table_styles([
+            {'selector': 'th.col_heading', 'props': [('text-align', 'center')]}
+        ])
+    )
 
+    # 2. Pass 'styled_df' directly into st.dataframe
     st.dataframe(
-        pd.DataFrame(df_rows).sort_values(by="Sheets Lost", ascending=False),
+        styled_df,
         use_container_width=True,
         hide_index=True,
         column_config={
@@ -882,11 +925,10 @@ elif st.session_state.question == "deep_dive":
                 max_value=max([r["Sheets Lost"] for r in df_rows]) if df_rows else 1,
                 width="large"
             ),
-            "Hours Lost": st.column_config.NumberColumn("Hrs/Mo", format="%.1f hrs", alignment="center"),
+            "Hours Lost": st.column_config.NumberColumn("Total Hrs", format="%.1f hrs", alignment="center"),
             "Mins/Shift": st.column_config.TextColumn("Per Shift", width="small", alignment="center"),
         }
     )
-
     # ── 3. CODE MAPPING GRID (REFERENCE CARDS) ───────────────────────────  
     # Reference card built from real parsed op codes + Auto-Count names.
     from floorplan_calculator import code_labels_by_category
@@ -906,8 +948,7 @@ elif st.session_state.question == "deep_dive":
 # ── FOOTER ────────────────────────────────────────────────────────────────
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(f"<div style='color:{C_MUTED};font-size:0.7rem;'>FloorPlan v1.0 · RRD Press Room · Calibrated Q1–Apr 2026 · Fleet accuracy -2.1% vs actual</div>", unsafe_allow_html=True)
-from floorplan_calculator import _PRESS_BY_ID
-from calculations.baseline import available_hours, running_speed_net
+
 
 with st.expander("🔧 Debug: Raw Press Metrics", expanded=False):
     debug_rows = []
@@ -930,5 +971,23 @@ with st.expander("🔧 Debug: Raw Press Metrics", expanded=False):
             "Running Speed":  round(running_speed_net(press), 1),
             "Downtime Hrs":   round(sum(press.downtime_by_lever.values()), 1),
         })
-    st.dataframe(pd.DataFrame(debug_rows), hide_index=True, use_container_width=True)
+    st.dataframe(
+    pd.DataFrame(debug_rows),
+    hide_index=True,
+    use_container_width=True,
+    column_config={
+        "Net Sheets":    st.column_config.NumberColumn("Net Sheets",    format="%,.0f"),
+        "Gross Sheets":  st.column_config.NumberColumn("Gross Sheets",  format="%,.0f"),
+        "Run Hrs":       st.column_config.NumberColumn("Run Hrs",       format="%.2f"),
+        "Logged Hrs":    st.column_config.NumberColumn("Logged Hrs",    format="%.2f"),
+        "Available Hrs": st.column_config.NumberColumn("Available Hrs", format="%.1f"),
+        "No Crew Hrs":   st.column_config.NumberColumn("No Crew Hrs",   format="%.2f"),
+        "Planned Maint": st.column_config.NumberColumn("Planned Maint", format="%.2f"),
+        "Downtime Hrs":  st.column_config.NumberColumn("Downtime Hrs",  format="%.1f"),
+        "Total Shifts":  st.column_config.NumberColumn("Total Shifts",  format="%d"),
+        "Job Count":     st.column_config.NumberColumn("Job Count",     format="%d"),
+        "Running Speed": st.column_config.NumberColumn("Running Speed", format="%,.1f"),
+        
+    }
+)
 
