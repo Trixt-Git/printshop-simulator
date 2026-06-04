@@ -132,6 +132,33 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
+# ── ACCESS GATE ───────────────────────────────────────────────────────────
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.markdown(f"""
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+        height:60vh;gap:1rem;">
+            <div style="font-size:2rem;font-weight:700;font-family:'IBM Plex Sans';
+            color:{C_WHITE};">FloorPlan</div>
+            <div style="font-size:0.85rem;color:{C_MUTED};margin-bottom:1rem;">
+            Press Room Decision Engine · RRD</div>
+        </div>
+    """, unsafe_allow_html=True)
+    _, col, _ = st.columns([2, 2, 2])
+    with col:
+        pwd = st.text_input("", placeholder="Access code", type="password",
+                            label_visibility="collapsed")
+        if st.button("Enter", use_container_width=True):
+            if pwd == "rrd2026":
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Incorrect access code.")
+    st.stop()
+
+
 # ── SESSION STATE (CLEANED) ───────────────────────────────────────────────
 if "question" not in st.session_state: st.session_state.question = "losses"
 if "fwd_press" not in st.session_state: st.session_state.fwd_press = "All"

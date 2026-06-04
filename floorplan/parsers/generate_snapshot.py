@@ -44,6 +44,8 @@ out_path = os.path.join(
     "data", "snapshot.json"
 )
 
+with open(out_path, "w") as f:
+    json.dump(snapshot, f, indent=2)
 
 print(f"Snapshot written to {out_path}")
 print(f"Periods: {sorted(snapshot.keys())}")

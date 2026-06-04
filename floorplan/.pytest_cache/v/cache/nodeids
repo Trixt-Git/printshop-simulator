@@ -1,0 +1,8 @@
+[
+  "tests/test.py::test_available_hours",
+  "tests/test.py::test_fleet_net_sheets",
+  "tests/test.py::test_fleet_press_count",
+  "tests/test.py::test_net_sheets",
+  "tests/test.py::test_running_speed",
+  "tests/test.py::test_total_shifts"
+]
