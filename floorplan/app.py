@@ -179,7 +179,7 @@ if "range_mode" not in st.session_state:
 available_months = get_available_months()
 
 if "start_month" not in st.session_state:
-    st.session_state.start_month = available_months[0]
+    st.session_state.start_month = available_months[-1]
 if "end_month" not in st.session_state:
     st.session_state.end_month = available_months[-1]
 
@@ -234,8 +234,15 @@ current    = fleet["total_reality"]
 with col_head:
     st.markdown(f"""
         <div style="font-size: 2rem; font-weight: 700; margin-bottom: 0rem; line-height: 1.2;">FloorPlan</div>
-        <div style="color:{C_MUTED}; font-size: 0.8rem; margin-top: 0.1rem; margin-bottom: 1rem;">Press Room Decision Engine · Calibrated Q1–Apr 2026</div>
+        <div style="color:{C_MUTED}; font-size: 0.8rem; margin-top: 0.1rem; margin-bottom: 0.3rem;">Press Room Decision Engine · RRD</div>
+        <div style="color:{C_MUTED}; font-size: 0.75rem; margin-bottom: 1rem;">
+            Showing {datetime.strptime(st.session_state.start_month, "%Y_%m").strftime("%b %y")} 
+            {"to " + datetime.strptime(st.session_state.end_month, "%Y_%m").strftime("%b %y") if st.session_state.end_month != st.session_state.start_month else "only"}
+            · {"Avg/month" if st.session_state.range_mode == "avg" else "Period total"}
+        </div>
     """, unsafe_allow_html=True)
+
+
 
 with col_range:
     st.markdown("<div style='margin-top:0.8rem;'></div>", unsafe_allow_html=True)
@@ -326,19 +333,19 @@ gap        = target - current
 all_levers = rank_opportunities(_active_presses, reduction_pct=IMPROVEMENT_PCT)
 
 # ── KPI STRIP ─────────────────────────────────────────────────────────────
-# Anomaly check -- flag any press with unusually low available hours
-anomalies = []
-for press in _active_presses:
-    avail = available_hours(press)
-    if press.total_logged_hrs > 0 and avail / press.total_logged_hrs < 0.25:
-        anomalies.append(f"Press {press.press_id}")
+# # Anomaly check -- flag any press with unusually low available hours
+# anomalies = []
+# for press in _active_presses:
+#     avail = available_hours(press)
+#     if press.total_logged_hrs > 0 and avail / press.total_logged_hrs < 0.25:
+#         anomalies.append(f"Press {press.press_id}")
 
-if anomalies:
-    st.warning(
-        f"⚠️ {', '.join(anomalies)} {'has' if len(anomalies) == 1 else 'have'} unusually low available hours "
-        f"in the selected range — results may not reflect normal capacity. "
-        f"Check for planned shutdowns or extended no-crew periods."
-    )
+# if anomalies:
+#     st.warning(
+#         f"⚠️ {', '.join(anomalies)} {'has' if len(anomalies) == 1 else 'have'} unusually low available hours "
+#         f"in the selected range — results may not reflect normal capacity. "
+#         f"Check for planned shutdowns or extended no-crew periods."
+#     )
 
 
 
