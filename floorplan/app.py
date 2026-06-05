@@ -195,6 +195,7 @@ else:
 
 
 
+
 # press_config lives in session state so settings panel edits flow into all calculations.
 # It starts as a deep copy of the defaults — user changes never touch the source of truth.
 if "press_config" not in st.session_state:
@@ -249,7 +250,7 @@ with col_range:
     with st.popover("📅 Range", use_container_width=True):
         if len(available_months) > 1:
             
-            st.session_state.start_month = st.selectbox(
+            new_start = st.selectbox(
                 "",
                 available_months,
                 index=available_months.index(st.session_state.start_month),
@@ -257,13 +258,12 @@ with col_range:
                 key="range_start",
                 label_visibility="collapsed"
             )
-
-            # Clamp end to start if needed
-            if st.session_state.start_month > st.session_state.end_month:
-                st.session_state.end_month = st.session_state.start_month
+            if new_start != st.session_state.start_month:
+                st.session_state.start_month = new_start
                 st.rerun()
 
-            st.session_state.end_month = st.selectbox(
+
+            new_end = st.selectbox(
                 "",
                 available_months,
                 index=available_months.index(st.session_state.end_month),
@@ -271,6 +271,16 @@ with col_range:
                 key="range_end",
                 label_visibility="collapsed"
             )
+            if new_end != st.session_state.end_month:
+                st.session_state.end_month = new_end
+                st.rerun()
+
+
+            # Clamp end to start if needed
+            if st.session_state.start_month > st.session_state.end_month:
+                st.session_state.end_month = st.session_state.start_month
+                st.rerun()
+
 
 
             
@@ -996,6 +1006,7 @@ with st.expander("🔧 Debug: Raw Press Metrics", expanded=False):
             "Net Sheets":     press.net_sheets,
             "Gross Sheets":   press.gross_sheets,
             "Run Hrs":        press.actual_run_hrs,
+            "Makeready Hrs": round(press.downtime_by_lever.get('makeready', 0), 1),
             "Logged Hrs":     press.total_logged_hrs,
             "Available Hrs":  round(available_hours(press), 1),
             "No Crew Hrs":    press.no_crew_hrs,
