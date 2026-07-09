@@ -47,8 +47,6 @@ out_path = os.path.join(
 with open(out_path, "w") as f:
     json.dump(snapshot, f, indent=2)
 
-with open(out_path, "w")
-
 print(f"Snapshot written to {out_path}")
 print(f"Periods: {sorted(snapshot.keys())}")
 for period, presses in snapshot.items():

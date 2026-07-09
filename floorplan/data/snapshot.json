@@ -1272,85 +1272,101 @@
       "press_id": "2060",
       "period_start": "2026-03-01",
       "period_end": "2026-03-31",
-      "net_sheets": 369176,
-      "gross_sheets": 375046,
-      "actual_run_hrs": 42.27,
-      "total_logged_hrs": 542.06,
-      "no_crew_hrs": 273.22,
-      "planned_maintenance_hrs": 54.93,
+      "net_sheets": 392213,
+      "gross_sheets": 407259,
+      "actual_run_hrs": 52.78,
+      "total_logged_hrs": 768.79,
+      "no_crew_hrs": 141.41,
+      "planned_maintenance_hrs": 298.54,
       "total_shifts": 27,
       "downtime_by_lever": {
-        "maintenance": 13.06,
-        "jams": 47.61,
-        "shift_handoff": 11.99,
-        "materials_wait": 2.13,
+        "maintenance": 28.02,
+        "jams": 74.91,
+        "shift_handoff": 21.09,
+        "materials_wait": 8.93,
         "quality_wait": 0.0,
-        "approval_wait": 0.0,
-        "makeready": 84.2
+        "approval_wait": 0.41,
+        "makeready": 123.81
       },
       "downtime_by_code": {
         "1000": {
-          "hours": 5.55,
+          "hours": 7.66,
           "name": "Make Ready"
         },
         "1010": {
-          "hours": 49.06,
+          "hours": 69.19,
           "name": "Make Ready 2"
         },
         "1060": {
-          "hours": 3.2,
+          "hours": 17.45,
           "name": "Cleanup/Washup/Teardown"
         },
         "2000": {
-          "hours": 3.67,
+          "hours": 5.56,
           "name": "Breakdown (mechanical)"
         },
         "2001": {
-          "hours": 2.54,
+          "hours": 2.57,
           "name": "Breakdown (electrical)"
         },
         "2011": {
-          "hours": 6.85,
+          "hours": 19.39,
           "name": "Maintenance (unplanned)"
         },
+        "2021": {
+          "hours": 0.02,
+          "name": "UV/Convential Ink Convert"
+        },
         "2040": {
-          "hours": 11.99,
+          "hours": 21.09,
           "name": "Shift Change / Hand Off"
         },
+        "2070": {
+          "hours": 1.38,
+          "name": "Jam / Trip Up / etc"
+        },
         "2075": {
-          "hours": 2.79,
+          "hours": 4.73,
           "name": "Wash Plates/Blankets"
         },
         "2076": {
-          "hours": 17.08,
+          "hours": 21.47,
           "name": "Set-Up Adjustment"
         },
-        "2082": {
-          "hours": 1.24,
-          "name": "Blanket Change"
+        "2080": {
+          "hours": 0.41,
+          "name": "Wait for Approval"
         },
         "2083": {
-          "hours": 5.28,
+          "hours": 3.28,
           "name": "Plate Change"
         },
         "2085": {
-          "hours": 26.27,
+          "hours": 35.1,
           "name": "Problem: Print Unit"
         },
         "2086": {
-          "hours": 2.52,
+          "hours": 11.97,
           "name": "Material feeder trouble"
         },
         "2087": {
-          "hours": 15.07,
+          "hours": 23.1,
           "name": "UV or IR lamp trouble"
         },
+        "2088": {
+          "hours": 0.5,
+          "name": "Ink Roller Maintenance"
+        },
         "2090": {
-          "hours": 2.13,
+          "hours": 8.82,
           "name": "Wait for Material"
         },
+        "2095": {
+          "hours": 0.11,
+          "name": "Replace Materials"
+        },
         "2097": {
-          "hours": 3.74,
+          "hours": 3.35,
           "name": "Problem: Feeder"
         }
       },
@@ -1360,113 +1376,121 @@
       "press_id": "2150",
       "period_start": "2026-03-01",
       "period_end": "2026-03-31",
-      "net_sheets": 737939,
-      "gross_sheets": 757723,
-      "actual_run_hrs": 133.32,
-      "total_logged_hrs": 584.93,
-      "no_crew_hrs": 46.81,
-      "planned_maintenance_hrs": 60.08,
+      "net_sheets": 991522,
+      "gross_sheets": 1006288,
+      "actual_run_hrs": 144.09,
+      "total_logged_hrs": 699.83,
+      "no_crew_hrs": 66.05,
+      "planned_maintenance_hrs": 85.36,
       "total_shifts": 57,
       "downtime_by_lever": {
-        "maintenance": 39.65,
-        "jams": 89.13,
-        "shift_handoff": 2.06,
-        "materials_wait": 14.89,
-        "quality_wait": 8.5,
-        "approval_wait": 1.44,
-        "makeready": 162.18
+        "maintenance": 41.17,
+        "jams": 92.81,
+        "shift_handoff": 5.62,
+        "materials_wait": 34.64,
+        "quality_wait": 10.99,
+        "approval_wait": 2.47,
+        "makeready": 187.28
       },
       "downtime_by_code": {
         "1000": {
-          "hours": 10.44,
+          "hours": 11.4,
           "name": "Make Ready"
         },
         "1010": {
-          "hours": 69.35,
+          "hours": 80.08,
           "name": "Make Ready 2"
         },
         "1050": {
-          "hours": 0.03,
+          "hours": 0.01,
           "name": "Auto-Restart"
         },
         "1060": {
-          "hours": 20.49,
+          "hours": 9.29,
           "name": "Cleanup/Washup/Teardown"
         },
         "2000": {
-          "hours": 20.4,
+          "hours": 20.69,
           "name": "Breakdown (mechanical)"
         },
         "2001": {
-          "hours": 15.25,
+          "hours": 7.67,
           "name": "Breakdown (electrical)"
         },
         "2011": {
-          "hours": 3.97,
+          "hours": 12.79,
           "name": "Maintenance (unplanned)"
         },
+        "2021": {
+          "hours": 2.38,
+          "name": "UV/Convential Ink Convert"
+        },
         "2040": {
-          "hours": 2.06,
+          "hours": 5.62,
           "name": "Shift Change / Hand Off"
         },
         "2070": {
-          "hours": 27.8,
+          "hours": 18.74,
           "name": "Jam / Trip Up / etc"
         },
         "2075": {
-          "hours": 36.57,
+          "hours": 50.05,
           "name": "Wash Plates/Blankets"
         },
         "2076": {
-          "hours": 9.39,
+          "hours": 5.99,
           "name": "Set-Up Adjustment"
         },
+        "2079": {
+          "hours": 0.09,
+          "name": "Waste Removal"
+        },
         "2080": {
-          "hours": 1.44,
+          "hours": 2.47,
           "name": "Wait for Approval"
         },
         "2082": {
-          "hours": 14.37,
+          "hours": 21.86,
           "name": "Blanket Change"
         },
         "2083": {
-          "hours": 1.57,
+          "hours": 6.15,
           "name": "Plate Change"
         },
         "2085": {
-          "hours": 7.7,
+          "hours": 34.37,
           "name": "Problem: Print Unit"
         },
         "2086": {
-          "hours": 48.81,
+          "hours": 33.92,
           "name": "Material feeder trouble"
         },
         "2087": {
-          "hours": 1.44,
+          "hours": 1.19,
           "name": "UV or IR lamp trouble"
         },
         "2090": {
-          "hours": 7.26,
+          "hours": 11.47,
           "name": "Wait for Material"
         },
         "2095": {
-          "hours": 7.18,
+          "hours": 12.0,
           "name": "Replace Materials"
         },
         "2096": {
-          "hours": 0.45,
+          "hours": 11.17,
           "name": "Raw Materials Non-conformance"
         },
         "2097": {
-          "hours": 3.38,
+          "hours": 4.58,
           "name": "Problem: Feeder"
         },
         "2120": {
-          "hours": 7.11,
+          "hours": 7.0,
           "name": "Wait for Quality Approval"
         },
         "2123": {
-          "hours": 1.39,
+          "hours": 3.98,
           "name": "Waiting for Quality Approval"
         }
       },
@@ -1476,110 +1500,102 @@
       "press_id": "2160",
       "period_start": "2026-03-01",
       "period_end": "2026-03-31",
-      "net_sheets": 653857,
-      "gross_sheets": 662121,
-      "actual_run_hrs": 114.31,
-      "total_logged_hrs": 659.25,
-      "no_crew_hrs": 116.99,
-      "planned_maintenance_hrs": 82.19,
+      "net_sheets": 907048,
+      "gross_sheets": 921127,
+      "actual_run_hrs": 160.17,
+      "total_logged_hrs": 711.35,
+      "no_crew_hrs": 51.93,
+      "planned_maintenance_hrs": 149.09,
       "total_shifts": 52,
       "downtime_by_lever": {
-        "maintenance": 30.76,
-        "jams": 54.48,
-        "shift_handoff": 0.18,
-        "materials_wait": 10.39,
-        "quality_wait": 3.2,
-        "approval_wait": 2.43,
-        "makeready": 206.78
+        "maintenance": 41.43,
+        "jams": 68.89,
+        "shift_handoff": 0.02,
+        "materials_wait": 9.31,
+        "quality_wait": 3.58,
+        "approval_wait": 3.69,
+        "makeready": 178.38
       },
       "downtime_by_code": {
         "1000": {
-          "hours": 54.56,
+          "hours": 32.7,
           "name": "Make Ready"
         },
         "1010": {
-          "hours": 126.73,
+          "hours": 111.06,
           "name": "Make Ready 2"
         },
         "1050": {
-          "hours": 2.48,
+          "hours": 0.29,
           "name": "Auto-Restart"
         },
         "1060": {
-          "hours": 3.02,
+          "hours": 5.48,
           "name": "Cleanup/Washup/Teardown"
         },
         "2000": {
-          "hours": 10.52,
+          "hours": 21.1,
           "name": "Breakdown (mechanical)"
         },
         "2001": {
-          "hours": 9.79,
+          "hours": 2.48,
           "name": "Breakdown (electrical)"
         },
         "2011": {
-          "hours": 7.97,
+          "hours": 17.56,
           "name": "Maintenance (unplanned)"
         },
-        "2021": {
-          "hours": 0.0,
-          "name": "UV/Convential Ink Convert"
-        },
         "2040": {
-          "hours": 0.18,
+          "hours": 0.02,
           "name": "Shift Change / Hand Off"
         },
         "2070": {
-          "hours": 33.0,
+          "hours": 34.38,
           "name": "Jam / Trip Up / etc"
         },
         "2075": {
-          "hours": 16.49,
+          "hours": 16.91,
           "name": "Wash Plates/Blankets"
         },
         "2076": {
-          "hours": 0.32,
+          "hours": 1.39,
           "name": "Set-Up Adjustment"
         },
         "2080": {
-          "hours": 2.43,
+          "hours": 3.69,
           "name": "Wait for Approval"
         },
         "2082": {
-          "hours": 5.09,
+          "hours": 10.08,
           "name": "Blanket Change"
         },
+        "2083": {
+          "hours": 0.23,
+          "name": "Plate Change"
+        },
         "2084": {
-          "hours": 0.57,
+          "hours": 0.53,
           "name": "Anilox Roller Change"
         },
         "2085": {
-          "hours": 12.96,
+          "hours": 11.34,
           "name": "Problem: Print Unit"
         },
         "2086": {
-          "hours": 3.37,
+          "hours": 7.4,
           "name": "Material feeder trouble"
         },
-        "2087": {
-          "hours": 1.21,
-          "name": "UV or IR lamp trouble"
-        },
         "2090": {
-          "hours": 10.39,
+          "hours": 9.31,
           "name": "Wait for Material"
         },
         "2097": {
-          "hours": 3.93,
+          "hours": 15.77,
           "name": "Problem: Feeder"
         },
         "2120": {
-          "hours": 3.09,
+          "hours": 3.58,
           "name": "Wait for Quality Approval"
-        },
-        "2123": {
-          "hours": 0.11,
-          "name": "Waiting for Quality Approval"
         }
       },
       "job_count": 81
@@ -1588,102 +1604,106 @@
       "press_id": "2190",
       "period_start": "2026-03-01",
       "period_end": "2026-03-31",
-      "net_sheets": 2018922,
-      "gross_sheets": 2018922,
-      "actual_run_hrs": 260.23,
-      "total_logged_hrs": 687.67,
-      "no_crew_hrs": 68.69,
-      "planned_maintenance_hrs": 45.45,
+      "net_sheets": 2277685,
+      "gross_sheets": 2277685,
+      "actual_run_hrs": 293.17,
+      "total_logged_hrs": 729.85,
+      "no_crew_hrs": 19.46,
+      "planned_maintenance_hrs": 74.08,
       "total_shifts": 56,
       "downtime_by_lever": {
-        "maintenance": 44.21,
-        "jams": 45.13,
-        "shift_handoff": 26.87,
-        "materials_wait": 3.83,
-        "quality_wait": 2.02,
-        "approval_wait": 6.87,
-        "makeready": 163.4
+        "maintenance": 27.85,
+        "jams": 56.24,
+        "shift_handoff": 16.51,
+        "materials_wait": 0.67,
+        "quality_wait": 4.1,
+        "approval_wait": 7.14,
+        "makeready": 203.95
       },
       "downtime_by_code": {
         "1000": {
-          "hours": 8.83,
+          "hours": 14.75,
           "name": "Make Ready"
         },
         "1010": {
-          "hours": 43.39,
+          "hours": 69.65,
           "name": "Make Ready 2"
         },
         "1060": {
-          "hours": 8.5,
+          "hours": 22.7,
           "name": "Cleanup/Washup/Teardown"
         },
         "2000": {
-          "hours": 17.49,
+          "hours": 5.96,
           "name": "Breakdown (mechanical)"
         },
         "2001": {
-          "hours": 4.45,
+          "hours": 1.89,
           "name": "Breakdown (electrical)"
         },
         "2011": {
-          "hours": 22.27,
+          "hours": 20.01,
           "name": "Maintenance (unplanned)"
         },
+        "2021": {
+          "hours": 0.14,
+          "name": "UV/Convential Ink Convert"
+        },
         "2040": {
-          "hours": 26.87,
+          "hours": 16.51,
           "name": "Shift Change / Hand Off"
         },
         "2070": {
-          "hours": 4.85,
+          "hours": 4.07,
           "name": "Jam / Trip Up / etc"
         },
         "2075": {
-          "hours": 45.29,
+          "hours": 45.49,
           "name": "Wash Plates/Blankets"
         },
         "2076": {
-          "hours": 16.38,
+          "hours": 16.96,
           "name": "Set-Up Adjustment"
         },
         "2080": {
-          "hours": 6.87,
+          "hours": 7.14,
           "name": "Wait for Approval"
         },
         "2082": {
-          "hours": 9.66,
+          "hours": 5.49,
           "name": "Blanket Change"
         },
         "2083": {
-          "hours": 31.34,
+          "hours": 28.76,
           "name": "Plate Change"
         },
         "2085": {
-          "hours": 32.0,
+          "hours": 44.95,
           "name": "Problem: Print Unit"
         },
         "2086": {
-          "hours": 0.52,
+          "hours": 0.62,
           "name": "Material feeder trouble"
         },
         "2087": {
-          "hours": 4.01,
+          "hours": 5.37,
           "name": "UV or IR lamp trouble"
         },
         "2090": {
-          "hours": 3.72,
+          "hours": 0.67,
           "name": "Wait for Material"
         },
-        "2096": {
-          "hours": 0.11,
-          "name": "Raw Materials Non-conformance"
-        },
         "2097": {
-          "hours": 3.76,
+          "hours": 1.23,
           "name": "Problem: Feeder"
         },
         "2120": {
-          "hours": 2.02,
+          "hours": 2.96,
           "name": "Wait for Quality Approval"
+        },
+        "2123": {
+          "hours": 1.14,
+          "name": "Waiting for Quality Approval"
         }
       },
       "job_count": 37
@@ -1692,94 +1712,90 @@
       "press_id": "2330",
       "period_start": "2026-03-01",
       "period_end": "2026-03-31",
-      "net_sheets": 329342,
-      "gross_sheets": 330010,
-      "actual_run_hrs": 50.45,
-      "total_logged_hrs": 648.64,
-      "no_crew_hrs": 469.34,
-      "planned_maintenance_hrs": 22.27,
+      "net_sheets": 131307,
+      "gross_sheets": 131307,
+      "actual_run_hrs": 22.49,
+      "total_logged_hrs": 754.94,
+      "no_crew_hrs": 669.72,
+      "planned_maintenance_hrs": 2.43,
       "total_shifts": 10,
       "downtime_by_lever": {
-        "maintenance": 19.55,
-        "jams": 33.39,
-        "shift_handoff": 1.14,
-        "materials_wait": 6.77,
-        "quality_wait": 0.43,
-        "approval_wait": 0.3,
-        "makeready": 34.28
+        "maintenance": 6.68,
+        "jams": 17.42,
+        "shift_handoff": 0.29,
+        "materials_wait": 5.63,
+        "quality_wait": 0.0,
+        "approval_wait": 0.48,
+        "makeready": 24.32
       },
       "downtime_by_code": {
         "1000": {
-          "hours": 6.43,
+          "hours": 3.32,
           "name": "Make Ready"
         },
         "1010": {
-          "hours": 12.28,
+          "hours": 11.24,
           "name": "Make Ready 2"
         },
-        "1050": {
-          "hours": 0.05,
-          "name": "Auto-Restart"
-        },
         "1060": {
-          "hours": 2.05,
+          "hours": 3.26,
           "name": "Cleanup/Washup/Teardown"
         },
         "2000": {
-          "hours": 13.21,
+          "hours": 1.1,
           "name": "Breakdown (mechanical)"
         },
         "2001": {
-          "hours": 6.29,
+          "hours": 5.04,
           "name": "Breakdown (electrical)"
         },
+        "2011": {
+          "hours": 0.53,
+          "name": "Maintenance (unplanned)"
+        },
         "2040": {
-          "hours": 1.14,
+          "hours": 0.14,
           "name": "Shift Change / Hand Off"
         },
+        "2041": {
+          "hours": 0.15,
+          "name": "Waiting for Crew"
+        },
         "2070": {
-          "hours": 17.48,
+          "hours": 4.08,
           "name": "Jam / Trip Up / etc"
         },
         "2075": {
-          "hours": 11.36,
+          "hours": 5.8,
           "name": "Wash Plates/Blankets"
         },
         "2080": {
-          "hours": 0.3,
+          "hours": 0.48,
           "name": "Wait for Approval"
         },
         "2082": {
-          "hours": 2.07,
+          "hours": 0.7,
           "name": "Blanket Change"
         },
-        "2083": {
-          "hours": 0.09,
-          "name": "Plate Change"
-        },
         "2085": {
-          "hours": 5.05,
+          "hours": 3.29,
           "name": "Problem: Print Unit"
         },
+        "2086": {
+          "hours": 0.09,
+          "name": "Material feeder trouble"
+        },
         "2090": {
-          "hours": 4.48,
+          "hours": 4.57,
           "name": "Wait for Material"
         },
         "2095": {
-          "hours": 1.59,
+          "hours": 1.06,
           "name": "Replace Materials"
         },
-        "2096": {
-          "hours": 0.7,
-          "name": "Raw Materials Non-conformance"
-        },
         "2097": {
-          "hours": 10.86,
+          "hours": 9.95,
           "name": "Problem: Feeder"
-        },
-        "2123": {
-          "hours": 0.43,
-          "name": "Waiting for Quality Approval"
         }
       },
       "job_count": 4
@@ -1788,102 +1804,106 @@
       "press_id": "2500",
       "period_start": "2026-03-01",
       "period_end": "2026-03-31",
-      "net_sheets": 814940,
-      "gross_sheets": 825176,
-      "actual_run_hrs": 116.78,
-      "total_logged_hrs": 650.39,
-      "no_crew_hrs": 247.98,
-      "planned_maintenance_hrs": 96.36,
+      "net_sheets": 1334303,
+      "gross_sheets": 1347054,
+      "actual_run_hrs": 179.54,
+      "total_logged_hrs": 745.68,
+      "no_crew_hrs": 177.67,
+      "planned_maintenance_hrs": 159.48,
       "total_shifts": 31,
       "downtime_by_lever": {
-        "maintenance": 15.59,
-        "jams": 32.21,
-        "shift_handoff": 0.74,
-        "materials_wait": 9.01,
-        "quality_wait": 0.13,
-        "approval_wait": 4.9,
-        "makeready": 98.92
+        "maintenance": 9.5,
+        "jams": 54.47,
+        "shift_handoff": 2.7,
+        "materials_wait": 6.05,
+        "quality_wait": 0.61,
+        "approval_wait": 4.78,
+        "makeready": 117.8
       },
       "downtime_by_code": {
         "1000": {
-          "hours": 11.17,
+          "hours": 14.33,
           "name": "Make Ready"
         },
         "1010": {
-          "hours": 41.84,
+          "hours": 34.06,
           "name": "Make Ready 2"
         },
         "1060": {
-          "hours": 10.22,
+          "hours": 34.3,
           "name": "Cleanup/Washup/Teardown"
         },
         "2000": {
-          "hours": 15.26,
+          "hours": 9.08,
           "name": "Breakdown (mechanical)"
         },
-        "2001": {
-          "hours": 0.1,
-          "name": "Breakdown (electrical)"
-        },
         "2011": {
-          "hours": 0.23,
+          "hours": 0.42,
           "name": "Maintenance (unplanned)"
         },
         "2040": {
-          "hours": 0.69,
+          "hours": 2.57,
           "name": "Shift Change / Hand Off"
         },
         "2041": {
-          "hours": 0.04,
+          "hours": 0.06,
           "name": "Waiting for Crew"
         },
         "2070": {
-          "hours": 15.72,
+          "hours": 33.74,
           "name": "Jam / Trip Up / etc"
         },
         "2075": {
-          "hours": 25.16,
+          "hours": 29.66,
           "name": "Wash Plates/Blankets"
         },
         "2076": {
-          "hours": 7.48,
+          "hours": 2.71,
           "name": "Set-Up Adjustment"
         },
         "2080": {
-          "hours": 4.9,
+          "hours": 4.78,
           "name": "Wait for Approval"
         },
         "2082": {
-          "hours": 2.63,
+          "hours": 2.16,
           "name": "Blanket Change"
         },
         "2083": {
-          "hours": 0.42,
+          "hours": 0.58,
           "name": "Plate Change"
         },
         "2085": {
-          "hours": 8.42,
+          "hours": 8.7,
           "name": "Problem: Print Unit"
         },
         "2086": {
-          "hours": 2.11,
+          "hours": 2.45,
           "name": "Material feeder trouble"
         },
+        "2089": {
+          "hours": 0.07,
+          "name": "One-Person Crew"
+        },
         "2090": {
-          "hours": 7.36,
+          "hours": 4.3,
           "name": "Wait for Material"
         },
         "2095": {
-          "hours": 1.66,
+          "hours": 0.98,
           "name": "Replace Materials"
         },
+        "2096": {
+          "hours": 0.77,
+          "name": "Raw Materials Non-conformance"
+        },
         "2097": {
-          "hours": 5.97,
+          "hours": 9.57,
           "name": "Problem: Feeder"
         },
-        "2123": {
-          "hours": 0.13,
-          "name": "Waiting for Quality Approval"
+        "2120": {
+          "hours": 0.61,
+          "name": "Wait for Quality Approval"
         }
       },
       "job_count": 13
@@ -3275,6 +3295,652 @@
         }
       },
       "job_count": 7
+    }
+  ],
+  "2026_06": [
+    {
+      "press_id": "2060",
+      "period_start": "2026-06-01",
+      "period_end": "2026-06-30",
+      "net_sheets": 199223,
+      "gross_sheets": 206025,
+      "actual_run_hrs": 28.11,
+      "total_logged_hrs": 686.04,
+      "no_crew_hrs": 367.02,
+      "planned_maintenance_hrs": 72.67,
+      "total_shifts": 28,
+      "downtime_by_lever": {
+        "maintenance": 54.37,
+        "jams": 52.57,
+        "shift_handoff": 7.65,
+        "materials_wait": 10.39,
+        "quality_wait": 0.82,
+        "approval_wait": 2.23,
+        "makeready": 73.77
+      },
+      "downtime_by_code": {
+        "1000": {
+          "hours": 1.92,
+          "name": "Make Ready"
+        },
+        "1010": {
+          "hours": 28.18,
+          "name": "Make Ready 2"
+        },
+        "1050": {
+          "hours": 0.01,
+          "name": "Auto-Restart"
+        },
+        "1060": {
+          "hours": 6.75,
+          "name": "Cleanup/Washup/Teardown"
+        },
+        "2000": {
+          "hours": 23.01,
+          "name": "Breakdown (mechanical)"
+        },
+        "2001": {
+          "hours": 6.65,
+          "name": "Breakdown (electrical)"
+        },
+        "2011": {
+          "hours": 24.71,
+          "name": "Maintenance (unplanned)"
+        },
+        "2040": {
+          "hours": 7.65,
+          "name": "Shift Change / Hand Off"
+        },
+        "2070": {
+          "hours": 0.21,
+          "name": "Jam / Trip Up / etc"
+        },
+        "2075": {
+          "hours": 5.42,
+          "name": "Wash Plates/Blankets"
+        },
+        "2076": {
+          "hours": 23.34,
+          "name": "Set-Up Adjustment"
+        },
+        "2078": {
+          "hours": 0.0,
+          "name": "Web Break"
+        },
+        "2080": {
+          "hours": 2.23,
+          "name": "Wait for Approval"
+        },
+        "2082": {
+          "hours": 5.41,
+          "name": "Blanket Change"
+        },
+        "2083": {
+          "hours": 1.7,
+          "name": "Plate Change"
+        },
+        "2084": {
+          "hours": 1.05,
+          "name": "Anilox Roller Change"
+        },
+        "2085": {
+          "hours": 11.72,
+          "name": "Problem: Print Unit"
+        },
+        "2086": {
+          "hours": 4.53,
+          "name": "Material feeder trouble"
+        },
+        "2087": {
+          "hours": 32.11,
+          "name": "UV or IR lamp trouble"
+        },
+        "2090": {
+          "hours": 10.39,
+          "name": "Wait for Material"
+        },
+        "2097": {
+          "hours": 4.0,
+          "name": "Problem: Feeder"
+        },
+        "2123": {
+          "hours": 0.82,
+          "name": "Waiting for Quality Approval"
+        }
+      },
+      "job_count": 4
+    },
+    {
+      "press_id": "2150",
+      "period_start": "2026-06-01",
+      "period_end": "2026-06-30",
+      "net_sheets": 1387659,
+      "gross_sheets": 1407151,
+      "actual_run_hrs": 188.32,
+      "total_logged_hrs": 676.43,
+      "no_crew_hrs": 70.85,
+      "planned_maintenance_hrs": 50.85,
+      "total_shifts": 49,
+      "downtime_by_lever": {
+        "maintenance": 25.22,
+        "jams": 55.81,
+        "shift_handoff": 30.67,
+        "materials_wait": 19.15,
+        "quality_wait": 5.59,
+        "approval_wait": 0.58,
+        "makeready": 202.77
+      },
+      "downtime_by_code": {
+        "1000": {
+          "hours": 9.78,
+          "name": "Make Ready"
+        },
+        "1010": {
+          "hours": 64.65,
+          "name": "Make Ready 2"
+        },
+        "1060": {
+          "hours": 19.38,
+          "name": "Cleanup/Washup/Teardown"
+        },
+        "2000": {
+          "hours": 19.5,
+          "name": "Breakdown (mechanical)"
+        },
+        "2001": {
+          "hours": 3.82,
+          "name": "Breakdown (electrical)"
+        },
+        "2011": {
+          "hours": 0.5,
+          "name": "Maintenance (unplanned)"
+        },
+        "2021": {
+          "hours": 17.58,
+          "name": "UV/Convential Ink Convert"
+        },
+        "2040": {
+          "hours": 30.0,
+          "name": "Shift Change / Hand Off"
+        },
+        "2041": {
+          "hours": 0.67,
+          "name": "Waiting for Crew"
+        },
+        "2070": {
+          "hours": 8.95,
+          "name": "Jam / Trip Up / etc"
+        },
+        "2075": {
+          "hours": 47.59,
+          "name": "Wash Plates/Blankets"
+        },
+        "2076": {
+          "hours": 18.63,
+          "name": "Set-Up Adjustment"
+        },
+        "2078": {
+          "hours": 0.0,
+          "name": "Web Break"
+        },
+        "2079": {
+          "hours": 0.31,
+          "name": "Waste Removal"
+        },
+        "2080": {
+          "hours": 0.58,
+          "name": "Wait for Approval"
+        },
+        "2081": {
+          "hours": 0.14,
+          "name": "Waiting for Color Match"
+        },
+        "2082": {
+          "hours": 18.05,
+          "name": "Blanket Change"
+        },
+        "2083": {
+          "hours": 5.99,
+          "name": "Plate Change"
+        },
+        "2084": {
+          "hours": 0.8,
+          "name": "Anilox Roller Change"
+        },
+        "2085": {
+          "hours": 19.6,
+          "name": "Problem: Print Unit"
+        },
+        "2086": {
+          "hours": 16.14,
+          "name": "Material feeder trouble"
+        },
+        "2087": {
+          "hours": 9.41,
+          "name": "UV or IR lamp trouble"
+        },
+        "2088": {
+          "hours": 1.4,
+          "name": "Ink Roller Maintenance"
+        },
+        "2090": {
+          "hours": 8.32,
+          "name": "Wait for Material"
+        },
+        "2095": {
+          "hours": 10.83,
+          "name": "Replace Materials"
+        },
+        "2097": {
+          "hours": 1.71,
+          "name": "Problem: Feeder"
+        },
+        "2120": {
+          "hours": 3.8,
+          "name": "Wait for Quality Approval"
+        },
+        "2123": {
+          "hours": 1.65,
+          "name": "Waiting for Quality Approval"
+        }
+      },
+      "job_count": 33
+    },
+    {
+      "press_id": "2160",
+      "period_start": "2026-06-01",
+      "period_end": "2026-06-30",
+      "net_sheets": 897525,
+      "gross_sheets": 910555,
+      "actual_run_hrs": 147.89,
+      "total_logged_hrs": 682.83,
+      "no_crew_hrs": 58.06,
+      "planned_maintenance_hrs": 49.74,
+      "total_shifts": 53,
+      "downtime_by_lever": {
+        "maintenance": 33.06,
+        "jams": 63.71,
+        "shift_handoff": 1.79,
+        "materials_wait": 11.16,
+        "quality_wait": 6.16,
+        "approval_wait": 3.38,
+        "makeready": 266.33
+      },
+      "downtime_by_code": {
+        "1000": {
+          "hours": 53.58,
+          "name": "Make Ready"
+        },
+        "1010": {
+          "hours": 137.24,
+          "name": "Make Ready 2"
+        },
+        "1060": {
+          "hours": 9.71,
+          "name": "Cleanup/Washup/Teardown"
+        },
+        "2000": {
+          "hours": 8.14,
+          "name": "Breakdown (mechanical)"
+        },
+        "2001": {
+          "hours": 8.25,
+          "name": "Breakdown (electrical)"
+        },
+        "2011": {
+          "hours": 16.67,
+          "name": "Maintenance (unplanned)"
+        },
+        "2021": {
+          "hours": 19.58,
+          "name": "UV/Convential Ink Convert"
+        },
+        "2040": {
+          "hours": 1.79,
+          "name": "Shift Change / Hand Off"
+        },
+        "2070": {
+          "hours": 22.37,
+          "name": "Jam / Trip Up / etc"
+        },
+        "2075": {
+          "hours": 23.59,
+          "name": "Wash Plates/Blankets"
+        },
+        "2076": {
+          "hours": 12.89,
+          "name": "Set-Up Adjustment"
+        },
+        "2080": {
+          "hours": 3.38,
+          "name": "Wait for Approval"
+        },
+        "2082": {
+          "hours": 5.29,
+          "name": "Blanket Change"
+        },
+        "2083": {
+          "hours": 3.17,
+          "name": "Plate Change"
+        },
+        "2084": {
+          "hours": 1.28,
+          "name": "Anilox Roller Change"
+        },
+        "2085": {
+          "hours": 19.14,
+          "name": "Problem: Print Unit"
+        },
+        "2086": {
+          "hours": 18.05,
+          "name": "Material feeder trouble"
+        },
+        "2090": {
+          "hours": 10.17,
+          "name": "Wait for Material"
+        },
+        "2095": {
+          "hours": 1.0,
+          "name": "Replace Materials"
+        },
+        "2097": {
+          "hours": 4.15,
+          "name": "Problem: Feeder"
+        },
+        "2120": {
+          "hours": 5.16,
+          "name": "Wait for Quality Approval"
+        },
+        "2123": {
+          "hours": 0.99,
+          "name": "Waiting for Quality Approval"
+        }
+      },
+      "job_count": 97
+    },
+    {
+      "press_id": "2190",
+      "period_start": "2026-06-01",
+      "period_end": "2026-06-30",
+      "net_sheets": 2024574,
+      "gross_sheets": 2024574,
+      "actual_run_hrs": 255.4,
+      "total_logged_hrs": 709.22,
+      "no_crew_hrs": 35.33,
+      "planned_maintenance_hrs": 79.06,
+      "total_shifts": 52,
+      "downtime_by_lever": {
+        "maintenance": 59.35,
+        "jams": 36.7,
+        "shift_handoff": 19.06,
+        "materials_wait": 4.7,
+        "quality_wait": 3.7,
+        "approval_wait": 3.86,
+        "makeready": 188.64
+      },
+      "downtime_by_code": {
+        "1000": {
+          "hours": 13.0,
+          "name": "Make Ready"
+        },
+        "1010": {
+          "hours": 60.41,
+          "name": "Make Ready 2"
+        },
+        "1060": {
+          "hours": 15.96,
+          "name": "Cleanup/Washup/Teardown"
+        },
+        "2000": {
+          "hours": 23.59,
+          "name": "Breakdown (mechanical)"
+        },
+        "2001": {
+          "hours": 9.38,
+          "name": "Breakdown (electrical)"
+        },
+        "2011": {
+          "hours": 26.38,
+          "name": "Maintenance (unplanned)"
+        },
+        "2021": {
+          "hours": 0.0,
+          "name": "UV/Convential Ink Convert"
+        },
+        "2040": {
+          "hours": 19.06,
+          "name": "Shift Change / Hand Off"
+        },
+        "2070": {
+          "hours": 2.52,
+          "name": "Jam / Trip Up / etc"
+        },
+        "2075": {
+          "hours": 49.91,
+          "name": "Wash Plates/Blankets"
+        },
+        "2076": {
+          "hours": 12.37,
+          "name": "Set-Up Adjustment"
+        },
+        "2078": {
+          "hours": 0.38,
+          "name": "Web Break"
+        },
+        "2079": {
+          "hours": 0.03,
+          "name": "Waste Removal"
+        },
+        "2080": {
+          "hours": 3.86,
+          "name": "Wait for Approval"
+        },
+        "2082": {
+          "hours": 4.21,
+          "name": "Blanket Change"
+        },
+        "2083": {
+          "hours": 32.74,
+          "name": "Plate Change"
+        },
+        "2085": {
+          "hours": 30.28,
+          "name": "Problem: Print Unit"
+        },
+        "2086": {
+          "hours": 0.66,
+          "name": "Material feeder trouble"
+        },
+        "2087": {
+          "hours": 1.59,
+          "name": "UV or IR lamp trouble"
+        },
+        "2090": {
+          "hours": 4.49,
+          "name": "Wait for Material"
+        },
+        "2095": {
+          "hours": 0.21,
+          "name": "Replace Materials"
+        },
+        "2097": {
+          "hours": 1.27,
+          "name": "Problem: Feeder"
+        },
+        "2120": {
+          "hours": 2.7,
+          "name": "Wait for Quality Approval"
+        },
+        "2123": {
+          "hours": 0.99,
+          "name": "Waiting for Quality Approval"
+        }
+      },
+      "job_count": 32
+    },
+    {
+      "press_id": "2330",
+      "period_start": "2026-06-01",
+      "period_end": "2026-06-30",
+      "net_sheets": 176276,
+      "gross_sheets": 176276,
+      "actual_run_hrs": 31.98,
+      "total_logged_hrs": 686.38,
+      "no_crew_hrs": 592.59,
+      "planned_maintenance_hrs": 3.2,
+      "total_shifts": 9,
+      "downtime_by_lever": {
+        "maintenance": 4.9,
+        "jams": 26.55,
+        "shift_handoff": 0.67,
+        "materials_wait": 0.5,
+        "quality_wait": 0.0,
+        "approval_wait": 0.16,
+        "makeready": 18.48
+      },
+      "downtime_by_code": {
+        "1000": {
+          "hours": 1.07,
+          "name": "Make Ready"
+        },
+        "1010": {
+          "hours": 8.45,
+          "name": "Make Ready 2"
+        },
+        "1060": {
+          "hours": 4.18,
+          "name": "Cleanup/Washup/Teardown"
+        },
+        "2000": {
+          "hours": 4.9,
+          "name": "Breakdown (mechanical)"
+        },
+        "2040": {
+          "hours": 0.67,
+          "name": "Shift Change / Hand Off"
+        },
+        "2070": {
+          "hours": 1.5,
+          "name": "Jam / Trip Up / etc"
+        },
+        "2075": {
+          "hours": 3.58,
+          "name": "Wash Plates/Blankets"
+        },
+        "2076": {
+          "hours": 1.21,
+          "name": "Set-Up Adjustment"
+        },
+        "2080": {
+          "hours": 0.16,
+          "name": "Wait for Approval"
+        },
+        "2085": {
+          "hours": 6.1,
+          "name": "Problem: Print Unit"
+        },
+        "2086": {
+          "hours": 7.19,
+          "name": "Material feeder trouble"
+        },
+        "2090": {
+          "hours": 0.5,
+          "name": "Wait for Material"
+        },
+        "2097": {
+          "hours": 11.76,
+          "name": "Problem: Feeder"
+        }
+      },
+      "job_count": 3
+    },
+    {
+      "press_id": "2500",
+      "period_start": "2026-06-01",
+      "period_end": "2026-06-30",
+      "net_sheets": 669310,
+      "gross_sheets": 672111,
+      "actual_run_hrs": 86.69,
+      "total_logged_hrs": 650.84,
+      "no_crew_hrs": 398.7,
+      "planned_maintenance_hrs": 59.51,
+      "total_shifts": 20,
+      "downtime_by_lever": {
+        "maintenance": 6.87,
+        "jams": 17.31,
+        "shift_handoff": 0.96,
+        "materials_wait": 10.54,
+        "quality_wait": 0.0,
+        "approval_wait": 0.95,
+        "makeready": 55.98
+      },
+      "downtime_by_code": {
+        "1000": {
+          "hours": 9.88,
+          "name": "Make Ready"
+        },
+        "1010": {
+          "hours": 19.88,
+          "name": "Make Ready 2"
+        },
+        "1060": {
+          "hours": 1.38,
+          "name": "Cleanup/Washup/Teardown"
+        },
+        "2000": {
+          "hours": 6.12,
+          "name": "Breakdown (mechanical)"
+        },
+        "2011": {
+          "hours": 0.75,
+          "name": "Maintenance (unplanned)"
+        },
+        "2040": {
+          "hours": 0.96,
+          "name": "Shift Change / Hand Off"
+        },
+        "2070": {
+          "hours": 10.52,
+          "name": "Jam / Trip Up / etc"
+        },
+        "2075": {
+          "hours": 17.36,
+          "name": "Wash Plates/Blankets"
+        },
+        "2076": {
+          "hours": 4.29,
+          "name": "Set-Up Adjustment"
+        },
+        "2080": {
+          "hours": 0.95,
+          "name": "Wait for Approval"
+        },
+        "2082": {
+          "hours": 0.9,
+          "name": "Blanket Change"
+        },
+        "2083": {
+          "hours": 2.28,
+          "name": "Plate Change"
+        },
+        "2085": {
+          "hours": 6.58,
+          "name": "Problem: Print Unit"
+        },
+        "2086": {
+          "hours": 0.21,
+          "name": "Material feeder trouble"
+        },
+        "2090": {
+          "hours": 8.96,
+          "name": "Wait for Material"
+        },
+        "2095": {
+          "hours": 1.58,
+          "name": "Replace Materials"
+        }
+      },
+      "job_count": 15
     }
   ]
 }
