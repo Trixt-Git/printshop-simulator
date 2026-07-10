@@ -259,8 +259,9 @@ with col_targ:
         if "target_mode" not in st.session_state: st.session_state.target_mode = "pct"
 
         if st.session_state.target_mode == "pct":
+            st.session_state.target_pct = int(st.session_state.target_pct)
             st.number_input("Growth Goal (%)", min_value=1, max_value=200,
-                value=int(st.session_state.target_pct), step=1, format="%d",
+                step=1, format="%d",
                 label_visibility="collapsed", key="target_pct")
         else:
             new_sheets = st.number_input("Target Sheets",
