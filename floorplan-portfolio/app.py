@@ -127,33 +127,6 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# ── ACCESS GATE ───────────────────────────────────────────────────────────
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-    st.markdown(f"""
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-        height:60vh;gap:1rem;">
-            <div style="font-size:2rem;font-weight:700;font-family:'IBM Plex Sans';
-            color:{C_WHITE};">FloorPlan</div>
-            <div style="font-size:0.85rem;color:{C_MUTED};margin-bottom:1rem;">
-            Press Room Decision Engine · Portfolio Demo</div>
-        </div>
-    """, unsafe_allow_html=True)
-    _, col, _ = st.columns([2, 2, 2])
-    with col:
-        pwd = st.text_input("", placeholder="Access code", type="password",
-                            label_visibility="collapsed")
-        if st.button("Enter", use_container_width=True):
-            if pwd == "demo":
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("Incorrect access code.")
-    st.stop()
-
-
 # ── SESSION STATE ─────────────────────────────────────────────────────────
 if "question" not in st.session_state: st.session_state.question = "losses"
 if "fwd_press" not in st.session_state: st.session_state.fwd_press = "All"
@@ -281,6 +254,16 @@ ui_target_pct     = st.session_state.target_pct
 target            = round(current * (1 + TARGET_GROWTH_PCT))
 gap               = target - current
 all_levers        = rank_opportunities(_active_presses, reduction_pct=IMPROVEMENT_PCT)
+
+# ── DISCLAIMER ────────────────────────────────────────────────────────────
+st.markdown(f"""
+<div style="background:{C_MID};border-left:3px solid {C_ACCENT};border-radius:4px;
+padding:0.55rem 0.9rem;margin-bottom:0.9rem;font-size:0.72rem;color:{C_MUTED};line-height:1.45;">
+<b style="color:{C_WHITE};">Demonstration build.</b> This is a portfolio reproduction of an
+enterprise-grade production decision engine. All figures shown are synthetic and are
+presented for illustrative purposes only.
+</div>
+""", unsafe_allow_html=True)
 
 # ── KPI STRIP ─────────────────────────────────────────────────────────────
 k1, k2, k3 = st.columns(3)
