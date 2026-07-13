@@ -1,0 +1,369 @@
+import sys
+import os
+import streamlit as st
+import plotly.express as px
+import pandas as pd
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from Project.Project.trading_card_generate_dataset import generate_dataset
+
+# ── PAGE CONFIG ───────────────────────────────────────────────────────────
+st.set_page_config(page_title="Print Shop Simulator", layout="wide")
+
+st.title("Trading Card Print Shop — Live Simulator")
+st.caption("Move any slider to rerun the simulation and see the system respond.")
+
+# ── SIDEBAR CONTROLS ──────────────────────────────────────────────────────
+st.sidebar.header("Simulation Controls")
+
+# ── BASELINE BUTTON ───────────────────────────────────────────────────────
+set_baseline = st.sidebar.button("📊 Set as Baseline", use_container_width=True)
+if st.session_state.get("baseline_set"):
+    st.sidebar.caption("✅ Baseline set — move sliders to compare")
+
+st.sidebar.divider()
+
+# ── FINANCIAL RATES ───────────────────────────────────────────────────────
+with st.sidebar.expander("Financial Rates", expanded=False):
+    st.markdown("**Press Rates ($/hr)**")
+    sf_cost_rate  = st.slider("Sheetfed Cost Rate",    200,  400, 220, step=10)
+    pf_cost_rate  = st.slider("Perfecting Cost Rate",  200,  400, 240, step=10)
+    sf_bill_rate  = st.slider("Sheetfed Bill Rate",   300,  500, 350, step=10)
+    pf_bill_rate  = st.slider("Perfecting Bill Rate", 300,  500, 385, step=10)
+    st.markdown("---")
+    st.markdown("**Stock Costs**")
+    stock_white = st.slider("White Stock ($/MSF)",  20, 150,  55, step=5)
+    stock_foil  = st.slider("Foil Stock ($/MSF)",  100, 600, 320, step=10)
+    ink_cost    = st.slider("Ink Cost ($/lb)",        5,  50,  20, step=1)
+
+# ── PRODUCT MIX ───────────────────────────────────────────────────────────
+with st.sidebar.expander("Product Mix", expanded=False):
+    avg_run_size = st.slider("Avg Run Size (sheets)", 5000, 100000, 10000, step=5000,
+                             help="Global average job size. Per-press run size variation to be added in a future update.")
+    st.markdown("---")
+    st.markdown("**Layout Mix** — relative weights")
+    mix_121_plain = st.slider("121-up White", 0.0, 1.0, 0.40, step=0.05)
+    mix_121_holo  = st.slider("121-up Foil",  0.0, 1.0, 0.25, step=0.05)
+    mix_100_plain = st.slider("100-up White", 0.0, 1.0, 0.15, step=0.05)
+    mix_100_holo  = st.slider("100-up Foil",  0.0, 1.0, 0.20, step=0.05)
+    st.markdown("---")
+    st.markdown("**Material**")
+    foil_waste = st.slider("Foil Waste Factor", 1.0, 2.0, 1.25, step=0.05,
+                           help="Multiplier applied to waste rate and jam rate for foil stock jobs. 1.25 = foil generates 25% more waste than white stock.")
+    jam_rate   = st.slider("Jam Rate (per 10K sheets)", 0.0, 0.15, 0.03, step=0.01)
+
+# ── CUSTOMER MARKUP ───────────────────────────────────────────────────────
+with st.sidebar.expander("Customer Markup", expanded=False):
+    markup_a    = st.slider("CUST-A Markup",           1.0, 2.0, 1.25, step=0.05)
+    markup_b    = st.slider("CUST-B Markup",           1.0, 2.0, 1.40, step=0.05)
+    markup_spot = st.slider("SPOT Markup",             1.0, 2.5, 1.55, step=0.05)
+    foil_prem   = st.slider("Foil Complexity Premium", 0.0, 0.5, 0.15, step=0.05,
+                            help="Additional markup added on top of the customer's base rate for foil jobs. 0.15 = 15 extra points of markup on any foil job.")
+    st.markdown("---")
+    st.markdown("**Customer Mix** — relative weights")
+    share_a    = st.slider("CUST-A Share", 0.0, 1.0, 0.70, step=0.05)
+    share_b    = st.slider("CUST-B Share", 0.0, 1.0, 0.20, step=0.05)
+    share_spot = st.slider("SPOT Share",   0.0, 1.0, 0.10, step=0.05)
+
+# ── PRESS CONTROLS ────────────────────────────────────────────────────────
+with st.sidebar.expander("Press Controls", expanded=False):
+    st.markdown("**Base Speeds (sph)**")
+    speed_white_sf = st.slider("White — Sheetfed",   5000, 15000, 10500, step=500)
+    speed_white_pf = st.slider("White — Perfecting", 5000, 15000,  9500, step=500)
+    speed_foil_sf  = st.slider("Foil — Sheetfed",    3000, 12000,  7500, step=500)
+    speed_foil_pf  = st.slider("Foil — Perfecting",  3000, 12000,  6500, step=500)
+    speed_noise    = st.slider("Speed Noise Std Dev",    0,   800,   400, step=50,
+                               help="Controls how much actual press speed varies around the baseline. Higher = more job-to-job variability in run times.")
+    st.markdown("---")
+    st.markdown("**Job Shares** — relative weights")
+    share_4210 = st.slider("4210 Share", 0.0, 1.0, 0.30, step=0.01)
+    share_4180 = st.slider("4180 Share", 0.0, 1.0, 0.21, step=0.01)
+    share_4140 = st.slider("4140 Share", 0.0, 1.0, 0.19, step=0.01)
+    share_4520 = st.slider("4520 Share", 0.0, 1.0, 0.16, step=0.01)
+    share_4360 = st.slider("4360 Share", 0.0, 1.0, 0.08, step=0.01)
+    share_4080 = st.slider("4080 Share", 0.0, 1.0, 0.06, step=0.01)
+    st.markdown("---")
+    st.markdown("**Age Factors**")
+    st.caption("1.15 = best maintained → 1.50 = most unreliable")
+    age_4210 = st.slider("4210 KBA106 — Perfecting",   1.0, 2.0, 1.15, step=0.05)
+    age_4520 = st.slider("4520 640 Komori — Sheetfed", 1.0, 2.0, 1.20, step=0.05)
+    age_4360 = st.slider("4360 640 Komori — Sheetfed", 1.0, 2.0, 1.20, step=0.05)
+    age_4140 = st.slider("4140 640 Komori — Sheetfed", 1.0, 2.0, 1.25, step=0.05)
+    age_4180 = st.slider("4180 840 Komori — Sheetfed", 1.0, 2.0, 1.30, step=0.05)
+    age_4080 = st.slider("4080 KBA105 — Perfecting",   1.0, 2.0, 1.50, step=0.05,
+                         help="Most unreliable press in fleet")
+
+# ── QUALITY CONTROL ───────────────────────────────────────────────────────
+with st.sidebar.expander("Quality Control", expanded=False):
+    st.markdown("**Rejection Thresholds**")
+    delta_e_reject    = st.slider("Color Delta E Reject",    1.0, 6.0, 3.5, step=0.1)
+    register_reject   = st.slider("Register Error Reject",   0.5, 4.0, 2.0, step=0.1)
+    dot_gain_reject   = st.slider("Dot Gain Reject (%)",    20.0,40.0,30.0, step=1.0)
+    cut_dev_reject    = st.slider("Cut Deviation Reject (mm)",0.1, 1.5, 0.5, step=0.05)
+    foil_adhesion_fail= st.slider("Foil Adhesion Fail",     40,  90,   70,  step=5)
+    st.markdown("---")
+    st.markdown("**QC Scrap & Downtime**")
+    defect_sheets     = st.slider("Sheets Tossed on QC Hit",  10, 200,  50, step=10)
+    qc_readjust_mins  = st.slider("Readjust Time (min)",        5,  60,  15, step=5)
+
+# ── NIGHT SHIFT ───────────────────────────────────────────────────────────
+with st.sidebar.expander("Night Shift", expanded=False):
+    night_waste   = st.slider("Night Waste Factor",   1.0, 1.5, 1.15, step=0.05)
+    night_quality = st.slider("Night Quality Factor", 1.0, 1.5, 1.15, step=0.05)
+
+# ── VOLUME ────────────────────────────────────────────────────────────────
+st.sidebar.subheader("Volume")
+num_jobs = st.sidebar.slider("Number of Jobs", 500, 5000, 1000, step=500)
+
+# ── RUN SIMULATION ────────────────────────────────────────────────────────
+@st.cache_data
+def run_sim(overrides_tuple):
+    return generate_dataset(dict(overrides_tuple))
+
+overrides = {
+    # Press age
+    "AGE_FACTOR_4210":            age_4210,
+    "AGE_FACTOR_4180":            age_4180,
+    "AGE_FACTOR_4140":            age_4140,
+    "AGE_FACTOR_4520":            age_4520,
+    "AGE_FACTOR_4360":            age_4360,
+    "AGE_FACTOR_4080":            age_4080,
+    # Press shares
+    "SHARE_4210":                 share_4210,
+    "SHARE_4180":                 share_4180,
+    "SHARE_4140":                 share_4140,
+    "SHARE_4520":                 share_4520,
+    "SHARE_4360":                 share_4360,
+    "SHARE_4080":                 share_4080,
+    # Speeds
+    "BASE_SPEED_WHITE_SHEETFED":  speed_white_sf,
+    "BASE_SPEED_WHITE_PERFECTING":speed_white_pf,
+    "BASE_SPEED_FOIL_SHEETFED":   speed_foil_sf,
+    "BASE_SPEED_FOIL_PERFECTING": speed_foil_pf,
+    "SPEED_NOISE_STD":            speed_noise,
+    # Product mix
+    "MIX_121_PLAIN":              mix_121_plain,
+    "MIX_121_HOLO":               mix_121_holo,
+    "MIX_100_PLAIN":              mix_100_plain,
+    "MIX_100_HOLO":               mix_100_holo,
+    "AVG_RUN_SIZE":               avg_run_size,
+    "FOIL_WASTE_FACTOR":          foil_waste,
+    "JAM_RATE_PER_10K_SHEETS":    jam_rate,
+    # Customer markup
+    "CUST_A_MARKUP":              markup_a,
+    "CUST_B_MARKUP":              markup_b,
+    "SPOT_MARKUP_PREMIUM":        markup_spot,
+    "COMPLEXITY_PREMIUM_FOIL":    foil_prem,
+    "CUST_A_SHARE":               share_a,
+    "CUST_B_SHARE":               share_b,
+    "SPOT_JOB_SHARE":             share_spot,
+    # Financial rates
+    "SHEETFED_RATE_HR":           sf_cost_rate,
+    "PERFECTING_RATE_HR":         pf_cost_rate,
+    "SHEETFED_BILL_RATE_HR":      sf_bill_rate,
+    "PERFECTING_BILL_RATE_HR":    pf_bill_rate,
+    "BURDEN_RATE_HR":             0,
+    "STOCK_COST_WHITE":           stock_white,
+    "STOCK_COST_FOIL":            stock_foil,
+    "INK_COST_PER_LB":            ink_cost,
+    # Quality control
+    "DELTA_E_REJECT":             delta_e_reject,
+    "REGISTER_REJECT":            register_reject,
+    "DOT_GAIN_REJECT":            dot_gain_reject,
+    "CUT_DEVIATION_REJECT":       cut_dev_reject,
+    "FOIL_ADHESION_FAIL":         foil_adhesion_fail,
+    "DEFECT_WINDOW_SHEETS":       defect_sheets,
+    "QC_READJUST_MINUTES":        qc_readjust_mins,
+    # Night shift
+    "NIGHT_WASTE_FACTOR":         night_waste,
+    "NIGHT_QUALITY_FACTOR":       night_quality,
+    # Volume
+    "NUM_JOBS":                   num_jobs,
+}
+
+with st.spinner("Running simulation..."):
+    df = run_sim(tuple(sorted(overrides.items())))
+
+# ── BASELINE ──────────────────────────────────────────────────────────────
+if "baseline_df" not in st.session_state:
+    st.session_state.baseline_df = df.copy()
+    st.session_state.baseline_set = False
+
+if set_baseline:
+    st.session_state.baseline_df = df.copy()
+    st.session_state.baseline_set = True
+
+baseline = st.session_state.baseline_df
+
+# ── KPI STRIP ─────────────────────────────────────────────────────────────
+# ── KPI STRIP ─────────────────────────────────────────────────────────────
+st.subheader("Core KPI:")
+k1, k2, k3 = st.columns(3)
+
+cur_profit      = df["gross_profit"].sum()
+cur_lost_hrs    = (df["jam_time_hrs"] + df["qc_downtime_hrs"]).sum()
+cur_throughput  = (df["qty_ordered"] * df["passes"]).sum() / df["total_press_time"].sum()
+
+base_profit     = baseline["gross_profit"].sum()
+base_lost_hrs   = (baseline["jam_time_hrs"] + baseline["qc_downtime_hrs"]).sum()
+base_throughput = (baseline["qty_ordered"] * baseline["passes"]).sum() / baseline["total_press_time"].sum()
+
+profit_diff     = cur_profit - base_profit
+lost_diff       = cur_lost_hrs - base_lost_hrs
+through_diff    = cur_throughput - base_throughput
+
+k1.metric("Profit:",
+          f"${cur_profit:,.0f}",
+          delta=f"{'-' if profit_diff < 0 else ''}${abs(profit_diff):,.0f}",
+          delta_color="normal")
+
+
+waste_material = (df["paper_cost"] * ((df["sheets_run"] - df["qty_ordered"])/df["sheets_run"])).sum()
+lost_time_cost = ((df["jam_time_hrs"]+df["qc_downtime_hrs"])*df["labor_rate"]).sum()
+curr_waste_dollars = waste_material + lost_time_cost
+curr_waste_pct = curr_waste_dollars / df["revenue"].sum()*100
+
+base_waste_material =(baseline["paper_cost"] * ((baseline["sheets_run"] - baseline["qty_ordered"])/baseline["sheets_run"])).sum()
+base_lost_time_cost = ((baseline["jam_time_hrs"]+baseline["qc_downtime_hrs"])*baseline["labor_rate"]).sum()
+base_waste_dollars = base_waste_material + base_lost_time_cost
+waste_diff = curr_waste_dollars - base_waste_dollars    
+
+k2.metric("Waste:",
+          f"${curr_waste_dollars:,.0f} ({curr_waste_pct:.1f}%)",
+          delta=f"${'-' if waste_diff < 0 else ''}{abs(waste_diff):,.0f}",
+          delta_color="inverse" )  
+
+
+
+k3.metric("Throughput",
+          f"{cur_throughput:,.0f} imp/hr",
+          delta=f"{through_diff:+.0f} imp/hr",
+          delta_color="normal")
+
+
+
+st.divider()
+
+# ── ROW 1: PROFIT BY PRESS + MARGIN BY CUSTOMER ───────────────────────────
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("<h3 style='text-align: center;'>Gross Profit by Press</h3>", unsafe_allow_html=True)
+    st.caption("Which presses are generating the most value — and which are dragging.")
+    profit_by_press = df.groupby("press")["gross_profit"].sum().reset_index()
+    profit_by_press.columns = ["press", "total_profit"]
+    profit_by_press["press"] = profit_by_press["press"].astype(str)
+    profit_by_press = profit_by_press.sort_values("total_profit", ascending=False)
+    worst_press = profit_by_press.iloc[-1]["press"]
+    bar_colors = ["#FF4455" if p == worst_press else "#4A90A4"
+                  for p in profit_by_press["press"]]
+    fig = px.bar(profit_by_press, x="press", y="total_profit",
+                 category_orders={"press": profit_by_press["press"].tolist()})
+    fig.update_traces(marker_color=bar_colors)
+    fig.update_layout(showlegend=False, xaxis_title="Press",
+                      yaxis_title="Total Gross Profit",
+                      yaxis_tickprefix="$", yaxis_tickformat=",",
+                      xaxis_type="category")
+    st.plotly_chart(fig, use_container_width=True)
+
+with col2:
+   st.markdown("<h3 style='text-align: center;'>Margin Distribution by Press</h3>", unsafe_allow_html=True)
+   avg_margin_by_press = df.groupby("press")["gross_margin_pct"].mean()
+   worst_press = avg_margin_by_press.idxmin()
+   st.caption(f"Press {worst_press} drags on margin — distribution shows consistency across the fleet.")
+   color_map = {p: "#FF4455" if p == worst_press else "#4A90A4"
+                for p in avg_margin_by_press.index}
+   press_order = avg_margin_by_press.sort_values().index.tolist()
+   fig = px.box(df, x="press", y="gross_margin_pct",
+                color="press",
+                color_discrete_map=color_map,
+                category_orders={"press": press_order})
+   fig.update_layout(
+       xaxis_title="Press",
+       yaxis_title="Margin %",
+       yaxis_ticksuffix="%",
+       showlegend=False,
+       xaxis_type="category",
+       xaxis=dict(showgrid=False),
+       yaxis=dict(gridcolor="#F0F0F0")
+   )
+   st.plotly_chart(fig, use_container_width=True)
+
+
+
+
+
+# ── ROW 2: QC FAIL BY PRESS + MARGIN TREND ────────────────────────────────
+col3, col4 = st.columns(2)
+
+with col3:
+    st.markdown("<h3 style='text-align: center;'>QC Failure Rate by Press</h3>", unsafe_allow_html=True)
+    st.caption("Operational risk. High failure rate = waste, delays, and margin compression.")
+    qc_by_press = df.groupby("press")["quality_pass"].apply(
+        lambda x: (1 - x.mean()) * 100
+    ).reset_index()
+    qc_by_press.columns = ["press", "fail_rate"]
+    qc_by_press["press"] = qc_by_press["press"].astype(str)
+    qc_by_press = qc_by_press.sort_values("fail_rate", ascending=False)
+    worst_qc = qc_by_press.iloc[0]["press"]
+    qc_colors = ["#FF4455" if p == worst_qc else "#4A90A4"
+                 for p in qc_by_press["press"]]
+    fig = px.bar(qc_by_press, x="press", y="fail_rate",
+                 category_orders={"press": qc_by_press["press"].tolist()})
+    fig.update_traces(marker_color=qc_colors)
+    fig.update_layout(showlegend=False, xaxis_title="Press",
+                      yaxis_title="QC Failure Rate %",
+                      yaxis_ticksuffix="%",
+                      xaxis_type="category")
+    st.plotly_chart(fig, use_container_width=True)
+
+with col4:
+    st.markdown("<h3 style='text-align: center;'>Revenue by Shift</h3>", unsafe_allow_html=True)
+    st.caption("Which shifts are generating the most value.")
+    rev_by_shift = df.groupby("shift")["revenue"].sum().reset_index()
+    rev_by_shift.columns = ["shift", "total_revenue"]
+    rev_by_shift = rev_by_shift.sort_values("total_revenue", ascending=False)
+    lowest_shift = rev_by_shift.iloc[-1]["shift"]
+    shift_colors = ["#FF4455" if s == lowest_shift else "#4A90A4"
+                    for s in rev_by_shift["shift"]]
+    fig = px.bar(rev_by_shift, x="shift", y="total_revenue",
+                 category_orders={"shift": rev_by_shift["shift"].tolist()})
+    fig.update_traces(marker_color=shift_colors)
+    fig.update_layout(showlegend=False, xaxis_title="Shift",
+                      yaxis_title="Total Revenue",
+                      yaxis_tickprefix="$", yaxis_tickformat=",",
+                      xaxis_type="category")
+    st.plotly_chart(fig, use_container_width=True)
+
+# ── PRESS SUMMARY TABLE ────────────────────────────────────────────────────
+col5, _ = st.columns([3, 1])
+with col5:
+    st.markdown("<h3 style='text-align: center;'>Gross Profit by Press</h3>", unsafe_allow_html=True)
+    press_summary = df.groupby("press").agg(
+        qc_pass_rate=("quality_pass", "mean"),
+        avg_waste=("waste_pct", "mean"),
+        avg_margin=("gross_margin_pct", "mean"),
+        avg_revenue=("revenue", "mean"),
+        avg_cost=("total_cost", "mean"),
+        avg_jams=("jam_count", "mean"),
+    ).round(2)
+    press_summary = press_summary.reindex(["4210","4520","4360","4140","4180","4080"])
+    press_summary.index.name = "Press"
+    press_summary_display = pd.DataFrame({
+    }, index=press_summary.index)
+    st.dataframe(press_summary_display, use_container_width=True)
+
+# ── DIAGNOSTIC CHECKS (uncomment to use) ──────────────────────────────────
+# st.dataframe(df[['color_delta_e','register_error','dot_gain_pct','cut_deviation_mm']].describe().round(3))
+# st.write("QC failure breakdown")
+# st.dataframe(pd.DataFrame({
+#     "delta_e_fails":       (df["color_delta_e"]    > 3.5).mean(),
+#     "register_fails":      (df["register_error"]   > 2.0).mean(),
+#     "dot_gain_fails":      (df["dot_gain_pct"]     > 30.0).mean(),
+#     "cut_dev_fails":       (df["cut_deviation_mm"] > 0.5).mean(),
+#     "foil_adhesion_fails": (df["foil_adhesion"]    < 70).mean(),
+# }, index=["fail_rate"]).T.round(3))
+# st.dataframe(df.groupby(["press","shift"])["quality_pass"].mean().unstack().round(3))
+
+# ── RAW DATA ──────────────────────────────────────────────────────────────
+with st.expander("Show raw data sample"):
+    st.dataframe(df.head(50))

@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+~$*.xlsx
+
+# Raw production exports must never be committed
+floorplan/data/*.csv
