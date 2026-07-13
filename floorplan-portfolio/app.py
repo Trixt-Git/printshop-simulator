@@ -134,7 +134,7 @@ if "fwd_cat" not in st.session_state: st.session_state.fwd_cat = "jams"
 if "fwd_pct" not in st.session_state: st.session_state.fwd_pct = 0
 if "target_pct" not in st.session_state: st.session_state.target_pct = 10
 if "plan_moves" not in st.session_state: st.session_state.plan_moves = []
-if "group_fleet_losses" not in st.session_state: st.session_state.group_fleet_losses = False
+if "group_fleet_losses" not in st.session_state: st.session_state.group_fleet_losses = True
 if "dd_group_mode" not in st.session_state: st.session_state.dd_group_mode = "detailed"
 if "selected_months" not in st.session_state: st.session_state.selected_months = get_available_months()
 if "range_mode" not in st.session_state: st.session_state.range_mode = "avg"
@@ -385,7 +385,7 @@ if st.session_state.question == "backward":
 # LOSSES — Biggest Issues
 # ══════════════════════════════════════════════════════════════════════════
 elif st.session_state.question == "losses":
-    if "group_fleet_losses" not in st.session_state: st.session_state.group_fleet_losses = False
+    if "group_fleet_losses" not in st.session_state: st.session_state.group_fleet_losses = True
 
     col_title, col_btn = st.columns([4, 1], vertical_alignment="bottom")
     with col_title:
