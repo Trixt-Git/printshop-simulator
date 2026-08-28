@@ -55,6 +55,8 @@ C_BG, C_SURFACE, C_MUTED, C_TEXT = "#F1F3F4", "#FFFFFF", "#5F6368", "#202124"
 C_ACCENT, C_ALERT, C_OK = "#1A73E8", "#D93025", "#34A853"
 C_OK_TEXT               = "#137333"   # darker green, for green *text* on light fills
 C_WARN                  = "#F29900"
+C_NAVY                  = "#0B2E5C"   # app-bar chrome and the #3 ranked bar
+C_TINT_RED              = "#FCE8E6"   # light-red fill behind alert medallions
 C_BORDER, C_BORDER_SOFT = "#DADCE0", "#E8EAED"
 C_TINT_BLUE             = "#E8F0FE"   # light-blue fill behind accent callouts
 C_TINT_GREEN            = "#E6F4EA"   # light-green fill behind success callouts
@@ -78,6 +80,25 @@ def fmt_k(n):
 
 def fmt_hrs(h): return f"{h:.1f} hrs"
 
+# KPI medallions: a tinted circle carrying a line icon, one per tone
+_SVG = ('<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" '
+        'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">{}</svg>')
+KPI_TONES = {
+    "blue":  (C_ACCENT,  C_TINT_BLUE,  _SVG.format('<path d="M6 20v-7M12 20V5M18 20v-4"/>')),
+    "red":   (C_ALERT,   C_TINT_RED,   _SVG.format('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/>')),
+    "green": (C_OK_TEXT, C_TINT_GREEN, _SVG.format('<path d="M6 21V4h11l-2 3.75L17 11.5H6"/>')),
+}
+
+def kpi_card(label: str, value: str, sub: str, tone: str = "blue") -> str:
+    color, tint, icon = KPI_TONES[tone]
+    return (f'<div class="kpi-block">'
+            f'<div class="kpi-icon" style="background:{tint};color:{color};">{icon}</div>'
+            f'<div class="kpi-body">'
+            f'<div class="kpi-label">{label}</div>'
+            f'<div class="kpi-value" style="color:{color};">{value}</div>'
+            f'<div class="kpi-sub">{sub}</div>'
+            f'</div></div>')
+
 # ── PAGE SETUP & STYLING ──────────────────────────────────────────────────
 st.set_page_config(page_title="FloorPlan", layout="wide", initial_sidebar_state="collapsed")
 
@@ -91,21 +112,38 @@ st.markdown(f"""
 
     html, body, [class*="css"] {{ font-family: 'IBM Plex Sans', sans-serif; background-color: {C_BG}; color: {C_TEXT}; }}
 
+    /* ── app bar ── */
+    .appbar {{ position: relative; width: 100vw; margin-left: calc(50% - 50vw); margin-bottom: 1.6rem;
+               background: {C_SURFACE}; border-bottom: 1px solid {C_BORDER}; }}
+    .appbar-strip {{ height: 6px; background: {C_NAVY}; }}
+    .appbar-inner {{ padding: 0.55rem 2.2rem; display: flex; align-items: center; gap: 1.6rem; }}
+    .appbar-logo {{ width: 34px; height: 34px; border-radius: 8px; background: {C_NAVY}; color: #FFFFFF;
+                    display: flex; align-items: center; justify-content: center;
+                    font-weight: 700; font-size: 1.1rem; }}
+    .appbar-word {{ font-size: 1.15rem; font-weight: 700; color: {C_TEXT}; margin-right: 0.8rem; }}
+    .appbar-nav {{ display: flex; align-items: center; gap: 1.5rem; }}
+    .appbar-nav span {{ font-size: 0.85rem; font-weight: 600; color: {C_MUTED}; padding: 0.9rem 0 0.75rem; }}
+    .appbar-nav span.on {{ color: {C_ACCENT}; box-shadow: inset 0 -3px 0 {C_ACCENT}; }}
+    .appbar-right {{ margin-left: auto; display: flex; align-items: center; gap: 1.1rem; color: {C_MUTED}; }}
+    .appbar-avatar {{ width: 32px; height: 32px; border-radius: 50%; background: {C_NAVY}; color: #FFFFFF;
+                      display: flex; align-items: center; justify-content: center;
+                      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em; }}
+
     .kpi-block {{
         background: {C_SURFACE};
         border: 1px solid {C_BORDER};
-        border-radius: 8px;
-        box-shadow: 0 1px 2px rgba(60,64,67,0.12);
-        padding: 0.7rem 1rem;
-        border-left: 3px solid {C_ACCENT};
-        text-align: center;
-        min-height: 90px;
+        border-radius: 10px;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.10);
+        padding: 0.9rem 1.1rem;
+        min-height: 96px;
         display: flex;
-        flex-direction: column;
-        justify-content: center;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.9rem;
     }}
-    .kpi-block.alert {{ border-left-color: {C_ALERT}; }}
-    .kpi-block.ok {{ border-left-color: {C_OK}; }}
+    .kpi-icon {{ width: 46px; height: 46px; border-radius: 50%; flex: 0 0 46px;
+                 display: flex; align-items: center; justify-content: center; }}
+    .kpi-body {{ flex: 1; min-width: 0; text-align: center; }}
 
     .kpi-label {{
         font-size: 0.72rem;
@@ -116,11 +154,12 @@ st.markdown(f"""
         margin-bottom: 0.2rem;
     }}
     .kpi-value {{
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 1.8rem;
-        font-weight: 600;
+        font-family: 'IBM Plex Sans', sans-serif;
+        font-size: 1.95rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
         color: {C_ACCENT};
-        line-height: 1.1;
+        line-height: 1.15;
     }}
     .kpi-sub {{
         font-size: 0.75rem;
@@ -130,7 +169,7 @@ st.markdown(f"""
 
     .section-label {{ font-size: 0.68rem; letter-spacing: 0.15em; text-transform: uppercase; color: {C_MUTED}; font-weight: 600; margin-bottom: 0.8rem; margin-top: 1.5rem; }}
 
-    div[data-testid="stButton"] > button {{ background: {C_SURFACE}; color: {C_ACCENT}; border: 1px solid {C_BORDER}; border-radius: 4px; width: 100%; font-weight: 600; }}
+    div[data-testid="stButton"] > button {{ background: {C_SURFACE}; color: {C_TEXT}; border: 1px solid {C_BORDER}; border-radius: 8px; width: 100%; font-weight: 600; padding: 0.5rem 0.9rem; }}
     div[data-testid="stButton"] > button:hover {{ background: {C_TINT_BLUE}; border-color: {C_ACCENT}; color: {C_ACCENT}; }}
 
     .lever-card {{ background: {C_SURFACE}; border: 1px solid {C_BORDER}; border-radius: 8px; box-shadow: 0 1px 2px rgba(60,64,67,0.12); padding: 1rem 1.2rem; margin-bottom: 0.6rem; border-left: 3px solid {C_ACCENT}; display: flex; justify-content: space-between; align-items: center; }}
@@ -148,6 +187,7 @@ st.markdown(f"""
     hr {{ border-color: {C_BORDER_SOFT} !important; margin: 1.2rem 0 !important; }}
     div[data-testid="stNumberInput"] button {{ display: flex !important; }}
     div[data-testid="stPopoverBody"] {{ padding: 0.5rem !important; }}
+    div[data-testid="stPopover"] > div > button {{ border-radius: 8px !important; }}
     footer {{ visibility: hidden; }}
 </style>
 """, unsafe_allow_html=True)
@@ -227,6 +267,31 @@ def fmt_duration(minutes: float) -> str:
     return f"{int(minutes)}m"
 
 
+# ── APP BAR ───────────────────────────────────────────────────────────────
+# Presentational chrome only — the nav items name the product surface, they
+# do not route anywhere. "Dashboard" is the view you are on.
+_ICON = ('<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" '
+         'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{}</svg>')
+st.markdown(f"""
+<div class="appbar">
+  <div class="appbar-strip"></div>
+  <div class="appbar-inner">
+    <div class="appbar-logo">F</div>
+    <div class="appbar-word">FloorPlan</div>
+    <div class="appbar-nav">
+      <span class="on">Dashboard</span><span>Press Rooms</span><span>Reports</span>
+      <span>Plans</span><span>Analytics</span>
+    </div>
+    <div class="appbar-right">
+      {_ICON.format('<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>')}
+      {_ICON.format('<path d="M18 8a6 6 0 1 0-12 0c0 7-2 9-2 9h16s-2-2-2-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>')}
+      {_ICON.format('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3 2.45V14"/><path d="M12 17.2v.01"/>')}
+      <div class="appbar-avatar">RR</div>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
 # ── HEADER ────────────────────────────────────────────────────────────────
 col_head, col_range, col_targ = st.columns([6, 1, 1])
 fleet   = fleet_summary(_active_presses)
@@ -234,7 +299,7 @@ current = fleet["total_reality"]
 
 with col_head:
     st.markdown(f"""
-        <div style="font-size: 2rem; font-weight: 700; margin-bottom: 0rem; line-height: 1.2;">FloorPlan</div>
+        <div style="font-size: 2.4rem; font-weight: 700; margin-bottom: 0rem; line-height: 1.15; letter-spacing:-0.02em;">FloorPlan</div>
         <div style="color:{C_MUTED}; font-size: 0.8rem; margin-top: 0.1rem; margin-bottom: 0.3rem;">Press Room Decision Engine · RRD</div>
         <div style="color:{C_MUTED}; font-size: 0.75rem; margin-bottom: 1rem;">
             Showing {datetime.strptime(st.session_state.start_month, "%Y_%m").strftime("%b %y")}
@@ -310,21 +375,23 @@ all_levers        = rank_opportunities(_active_presses, reduction_pct=IMPROVEMEN
 # ── KPI STRIP ─────────────────────────────────────────────────────────────
 k1, k2, k3 = st.columns(3)
 with k1:
-    st.markdown(f'<div class="kpi-block"><div class="kpi-label">Output</div><div class="kpi-value">{fmt_k(current)}</div><div class="kpi-sub">sheets produced</div></div>', unsafe_allow_html=True)
+    st.markdown(kpi_card("Output", fmt_k(current), "sheets produced", "blue"), unsafe_allow_html=True)
 with k2:
-    st.markdown(f'<div class="kpi-block alert"><div class="kpi-label">Gap to Target</div><div class="kpi-value" style="color:{C_ALERT};">-{fmt_k(gap)}</div><div class="kpi-sub">+{ui_target_pct}% growth goal · target {fmt_k(target)}</div></div>', unsafe_allow_html=True)
+    st.markdown(kpi_card("Gap to Target", f"-{fmt_k(gap)}",
+                         f"+{ui_target_pct}% growth goal · target {fmt_k(target)}", "red"), unsafe_allow_html=True)
 with k3:
-    st.markdown(f'<div class="kpi-block"><div class="kpi-label">Goal</div><div class="kpi-value">{fmt_k(target)}</div><div class="kpi-sub">+{ui_target_pct}% target · {fmt_k(gap)} to go</div></div>', unsafe_allow_html=True)
+    st.markdown(kpi_card("Goal", fmt_k(target),
+                         f"+{ui_target_pct}% target · {fmt_k(gap)} to go", "green"), unsafe_allow_html=True)
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
 # ── NAV BUTTONS ───────────────────────────────────────────────────────────
 q1, q2, q3, q4, spacer, q5 = st.columns([3,3,3,3,6,2])
-if q1.button("📊 Biggest losses", key="btn_loss", use_container_width=True): st.session_state.question = "losses"; st.rerun()
-if q2.button("🎯 Path to target", key="btn_bwd", use_container_width=True): st.session_state.question = "backward"; st.rerun()
-if q3.button("🔧 Build a plan", key="btn_plan", use_container_width=True): st.session_state.question = "plan"; st.rerun()
-if q4.button("Deep Dive 🔍", use_container_width=True): st.session_state.question = "deep_dive"; st.rerun()
-if q5.button("Reset", key="btn_reset", use_container_width=True):
+if q1.button("📊 Biggest Losses", key="btn_loss", use_container_width=True): st.session_state.question = "losses"; st.rerun()
+if q2.button("🎯 Path to Target", key="btn_bwd", use_container_width=True): st.session_state.question = "backward"; st.rerun()
+if q3.button("🔧 Build a Plan", key="btn_plan", use_container_width=True): st.session_state.question = "plan"; st.rerun()
+if q4.button("🔍 Deep Dive", use_container_width=True): st.session_state.question = "deep_dive"; st.rerun()
+if q5.button("↺ Reset", key="btn_reset", use_container_width=True):
     st.session_state.question = "losses"; st.session_state.fwd_pct = 0
     st.session_state.plan_moves = []; st.rerun()
 
@@ -431,11 +498,10 @@ if st.session_state.question == "backward":
 elif st.session_state.question == "losses":
     if "group_fleet_losses" not in st.session_state: st.session_state.group_fleet_losses = True
 
+    # the chart card carries its own title, so this row is just the toggle
     col_title, col_btn = st.columns([4, 1], vertical_alignment="bottom")
-    with col_title:
-        st.markdown('<div class="section-label" style="margin-top:0.5rem; margin-bottom: 0.5rem;">Top Sheet Losses Per Month</div>', unsafe_allow_html=True)
     with col_btn:
-        btn_text = "Ungroup Presses" if st.session_state.group_fleet_losses else "Group All Presses"
+        btn_text = "⊞ Ungroup Presses" if st.session_state.group_fleet_losses else "⊞ Group All Presses"
         if st.button(btn_text, key="btn_group_all", use_container_width=True):
             st.session_state.group_fleet_losses = not st.session_state.group_fleet_losses
             st.rerun()
@@ -465,35 +531,65 @@ elif st.session_state.question == "losses":
         v = l["sheets_gained"]
         if l["press"] == "All":
             bar_labels.append(f" ~ {cat_label}")
-            bar_text.append(f" ~ {cat_label}    ({fmt_k(v)})")
+            bar_text.append(f"  {cat_label}")
             total_shifts = sum(p.total_shifts for p in _active_presses)
             mps_val = (l["hours_saved"] * 60) / total_shifts if total_shifts > 0 else 0
             bar_mps.append(f"{int(mps_val)} min/shift (fleet avg)")
         else:
             bar_labels.append(f"Press {l['press']} · {cat_label}")
-            bar_text.append(f"  Press {l['press']} · {cat_label}    ({fmt_k(v)})")
+            bar_text.append(f"  Press {l['press']} · {cat_label}")
             mps_shifts = active_by_id[l["press"]].total_shifts
             mps_val = round((l["hours_saved"] * 60) / mps_shifts, 1) if mps_shifts > 0 else 0
             bar_mps.append(f"{int(mps_val)} min/shift")
 
     bar_vals   = [l["sheets_gained"] for l in levers]
     bar_hrs    = [l["hours_saved"] for l in levers]
-    bar_colors = [C_OK if i == 0 else C_ACCENT if i <= 2 else C_BAR_NEUTRAL for i in range(top_n)]
+    # Top three are ranked green / blue / navy; everything below is neutral
+    RANK_COLORS = [C_OK, C_ACCENT, C_NAVY]
+    bar_colors = [RANK_COLORS[i] if i < 3 else C_BAR_NEUTRAL for i in range(top_n)]
     # Ranked bars are saturated (white labels); the neutral tail is light (dark labels)
     bar_text_colors = [text_on(c) for c in bar_colors]
 
+    # A label only goes inside a bar wide enough to hold it. The 7px/char estimate
+    # runs a little fat for 13px IBM Plex Sans on purpose: overshooting parks a
+    # label outside (dark, still readable), undershooting would spill white text
+    # past the bar end onto white. Narrow bars carry their value out there too.
+    x_max        = max(bar_vals) * 1.18 if bar_vals else 1
+    PLOT_PX      = 1120
+    fits_inside  = [(v / x_max) * PLOT_PX > len(t) * 7.0 + 16 for v, t in zip(bar_vals, bar_text)]
+    bar_positions = ["inside" if ok else "outside" for ok in fits_inside]
+    bar_text     = [t if ok else f"{t.strip()}   {fmt_k(v)}"
+                    for t, ok, v in zip(bar_text, fits_inside, bar_vals)]
+    bar_text_colors = [c if ok else C_TEXT for c, ok in zip(bar_text_colors, fits_inside)]
+
     fig = go.Figure(go.Bar(
-        x=bar_vals, y=bar_labels, orientation="h", marker_color=bar_colors,
-        text=bar_text, textposition="auto", insidetextanchor="start",
+        x=bar_vals, y=bar_labels, orientation="h",
+        marker=dict(color=bar_colors, cornerradius=4),
+        text=bar_text, textposition=bar_positions, insidetextanchor="start",
         textfont=dict(family="IBM Plex Sans", size=13, color=bar_text_colors),
+        cliponaxis=False, constraintext="none",
         hovertemplate="<b>%{y}</b><br>+%{x:,.0f} sheets (100% recovery)<br>%{customdata[0]:.1f} Total Hrs · <b>%{customdata[1]}</b><extra></extra>",
         customdata=list(zip(bar_hrs, bar_mps)),
     ))
+    # value sits outside the bar, tinted to match it — muted for the neutral tail
+    for lab, val, col, ok in zip(bar_labels, bar_vals, bar_colors, fits_inside):
+        if not ok:
+            continue
+        fig.add_annotation(
+            x=val, y=lab, text=fmt_k(val), showarrow=False,
+            xanchor="left", xshift=10, yanchor="middle",
+            font=dict(family="IBM Plex Sans", size=12.5,
+                      color=col if col != C_BAR_NEUTRAL else C_MUTED),
+        )
     fig.update_layout(
-        height=top_n * 35 + 24, margin=dict(l=12, r=12, t=14, b=14),
+        height=top_n * 38 + 60, margin=dict(l=14, r=14, t=52, b=14),
+        title=dict(text="TOP SHEET LOSSES PER MONTH", x=0, xref="paper", xanchor="left",
+                   y=1, yref="container", yanchor="top", pad=dict(t=16, l=2),
+                   font=dict(family="IBM Plex Sans", size=11.5, color=C_MUTED)),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(visible=False), yaxis=dict(visible=False, autorange="reversed"),
-        showlegend=False,
+        xaxis=dict(visible=False, range=[0, x_max]),
+        yaxis=dict(visible=False, autorange="reversed"),
+        bargap=0.28, showlegend=False,
     )
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
