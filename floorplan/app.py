@@ -50,8 +50,26 @@ LEVER_TYPE = {
     "speed":"Process",
 }
 
-C_DARK, C_MID, C_MUTED, C_WHITE = "#111827", "#374151", "#6B7280", "#FFFFFF"
-C_ACCENT, C_ALERT, C_OK = "#2563EB", "#DC2626", "#16A34A"
+# Palette — light "report" theme, tuned to match the plant's Looker Studio dashboards
+C_BG, C_SURFACE, C_MUTED, C_TEXT = "#F1F3F4", "#FFFFFF", "#5F6368", "#202124"
+C_ACCENT, C_ALERT, C_OK = "#1A73E8", "#D93025", "#34A853"
+C_OK_TEXT               = "#137333"   # darker green, for green *text* on light fills
+C_WARN                  = "#F29900"
+C_BORDER, C_BORDER_SOFT = "#DADCE0", "#E8EAED"
+C_TINT_BLUE             = "#E8F0FE"   # light-blue fill behind accent callouts
+C_TINT_GREEN            = "#E6F4EA"   # light-green fill behind success callouts
+C_BAR_NEUTRAL           = "#DADCE0"   # comparison / low-rank series bars
+C_BAR_BLUE, C_BAR_RED   = "#AECBFA", "#F6AEA9"   # tinted chart fills (dark labels)
+# Categorical series order mirrors the dashboard: green, blue, orange, red, ...
+SERIES_COLORS = [C_OK, "#4285F4", C_WARN, "#EA4335", "#12B5CB", "#A142F4", "#FF6D01"]
+
+def text_on(bg_hex: str) -> str:
+    """White or near-black label, whichever reads better on the given fill."""
+    r, g, b = (int(bg_hex[i:i+2], 16) / 255 for i in (1, 3, 5))
+    lin = lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+    return "#FFFFFF" if lum < 0.36 else C_TEXT
+
 
 def fmt_k(n):
     if abs(n) >= 1_000_000: return f"{n/1_000_000:.2f}M"
@@ -71,11 +89,13 @@ st.markdown(f"""
     [data-testid="stAppViewBlockContainer"] {{ padding-top: 0rem !important; margin-top: -4rem !important; }}
     .stAppViewMain .block-container {{ padding: 1rem 2.5rem 0rem 2.5rem !important; max-width: 1200px; }}
 
-    html, body, [class*="css"] {{ font-family: 'IBM Plex Sans', sans-serif; background-color: {C_DARK}; color: {C_WHITE}; }}
+    html, body, [class*="css"] {{ font-family: 'IBM Plex Sans', sans-serif; background-color: {C_BG}; color: {C_TEXT}; }}
 
     .kpi-block {{
-        background: {C_MID};
-        border-radius: 4px;
+        background: {C_SURFACE};
+        border: 1px solid {C_BORDER};
+        border-radius: 8px;
+        box-shadow: 0 1px 2px rgba(60,64,67,0.12);
         padding: 0.7rem 1rem;
         border-left: 3px solid {C_ACCENT};
         text-align: center;
@@ -86,7 +106,7 @@ st.markdown(f"""
     }}
     .kpi-block.alert {{ border-left-color: {C_ALERT}; }}
     .kpi-block.ok {{ border-left-color: {C_OK}; }}
-    
+
     .kpi-label {{
         font-size: 0.72rem;
         letter-spacing: 0.12em;
@@ -99,7 +119,7 @@ st.markdown(f"""
         font-family: 'IBM Plex Mono', monospace;
         font-size: 1.8rem;
         font-weight: 600;
-        color: {C_WHITE};
+        color: {C_ACCENT};
         line-height: 1.1;
     }}
     .kpi-sub {{
@@ -110,17 +130,22 @@ st.markdown(f"""
 
     .section-label {{ font-size: 0.68rem; letter-spacing: 0.15em; text-transform: uppercase; color: {C_MUTED}; font-weight: 600; margin-bottom: 0.8rem; margin-top: 1.5rem; }}
 
-    div[data-testid="stButton"] > button {{ background: {C_MID}; color: {C_WHITE}; border: 1px solid #4B5563; border-radius: 4px; width: 100%; font-weight: 600; }}
-    div[data-testid="stButton"] > button:hover {{ background: {C_ACCENT}; border-color: {C_ACCENT}; }}
+    div[data-testid="stButton"] > button {{ background: {C_SURFACE}; color: {C_ACCENT}; border: 1px solid {C_BORDER}; border-radius: 4px; width: 100%; font-weight: 600; }}
+    div[data-testid="stButton"] > button:hover {{ background: {C_TINT_BLUE}; border-color: {C_ACCENT}; color: {C_ACCENT}; }}
 
-    .lever-card {{ background: {C_MID}; border-radius: 4px; padding: 1rem 1.2rem; margin-bottom: 0.6rem; border-left: 3px solid {C_ACCENT}; display: flex; justify-content: space-between; align-items: center; }}
-    .lever-card.top {{ border-left-color: {C_OK}; background: #1a2e1a; }}
-    .lever-gain {{ font-family: 'IBM Plex Mono', monospace; font-size: 1.1rem; font-weight: 600; color: {C_OK}; }}
+    .lever-card {{ background: {C_SURFACE}; border: 1px solid {C_BORDER}; border-radius: 8px; box-shadow: 0 1px 2px rgba(60,64,67,0.12); padding: 1rem 1.2rem; margin-bottom: 0.6rem; border-left: 3px solid {C_ACCENT}; display: flex; justify-content: space-between; align-items: center; }}
+    .lever-card.top {{ border-left-color: {C_OK}; background: {C_TINT_GREEN}; }}
+    .lever-gain {{ font-family: 'IBM Plex Mono', monospace; font-size: 1.1rem; font-weight: 600; color: {C_OK_TEXT}; }}
 
-    .result-callout {{ background: #1e3a5f; border: 1px solid {C_ACCENT}; border-radius: 4px; padding: 1rem 1.5rem; text-align: center; }}
-    .result-callout.success {{ background: #14290f; border-color: {C_OK}; }}
-    
-    hr {{ border-color: #374151 !important; margin: 1.2rem 0 !important; }}
+    .result-callout {{ background: {C_TINT_BLUE}; border: 1px solid {C_ACCENT}; border-radius: 8px; padding: 1rem 1.5rem; text-align: center; }}
+    .result-callout.success {{ background: {C_TINT_GREEN}; border-color: {C_OK}; }}
+
+    /* charts and tables sit on white tiles, like the plant dashboards */
+    div[data-testid="stPlotlyChart"] {{ background: {C_SURFACE}; border: 1px solid {C_BORDER}; border-radius: 8px; box-shadow: 0 1px 2px rgba(60,64,67,0.12); }}
+    div[data-testid="stDataFrame"] {{ border-radius: 8px; overflow: hidden; }}
+    div[data-testid="stExpander"] details {{ background: {C_SURFACE}; border: 1px solid {C_BORDER}; border-radius: 8px; }}
+
+    hr {{ border-color: {C_BORDER_SOFT} !important; margin: 1.2rem 0 !important; }}
     div[data-testid="stNumberInput"] button {{ display: flex !important; }}
     div[data-testid="stPopoverBody"] {{ padding: 0.5rem !important; }}
     footer {{ visibility: hidden; }}
@@ -136,7 +161,7 @@ if not st.session_state.authenticated:
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
         height:60vh;gap:1rem;">
             <div style="font-size:2rem;font-weight:700;font-family:'IBM Plex Sans';
-            color:{C_WHITE};">FloorPlan</div>
+            color:{C_TEXT};">FloorPlan</div>
             <div style="font-size:0.85rem;color:{C_MUTED};margin-bottom:1rem;">
             Press Room Decision Engine · RRD</div>
         </div>
@@ -161,7 +186,7 @@ if "fwd_cat" not in st.session_state: st.session_state.fwd_cat = "jams"
 if "fwd_pct" not in st.session_state: st.session_state.fwd_pct = 0
 if "target_pct" not in st.session_state: st.session_state.target_pct = 10
 if "plan_moves" not in st.session_state: st.session_state.plan_moves = []
-if "group_fleet_losses" not in st.session_state: st.session_state.group_fleet_losses = False
+if "group_fleet_losses" not in st.session_state: st.session_state.group_fleet_losses = True
 if "dd_group_mode" not in st.session_state: st.session_state.dd_group_mode = "detailed"
 if "selected_months" not in st.session_state: st.session_state.selected_months = get_available_months()
 if "range_mode" not in st.session_state: st.session_state.range_mode = "avg"
@@ -311,7 +336,7 @@ if st.session_state.question == "backward":
     st.markdown("<hr>", unsafe_allow_html=True)
     plan = what_would_it_take(_active_presses, target, reduction_pct=IMPROVEMENT_PCT)
 
-    st.markdown('<div style="margin-top: -2rem; margin-bottom: 1rem; font-size: 0.9rem; color: #9CA3AF; text-align: left;"><i>All items show 20% improvement to hit target</i></div>', unsafe_allow_html=True)
+    st.markdown('<div style="margin-top: -2rem; margin-bottom: 1rem; font-size: 0.9rem; color: #5F6368; text-align: left;"><i>All items show 20% improvement to hit target</i></div>', unsafe_allow_html=True)
 
     card_cols = st.columns(2)
     cum_closed = 0
@@ -329,30 +354,32 @@ if st.session_state.question == "backward":
 
         with card_cols[i % 2]:
             border_color     = C_OK if i == 0 else C_ACCENT
+            value_color      = C_OK_TEXT if i == 0 else C_ACCENT
             current_mps_val  = (baseline * 60) / total_shifts if total_shifts > 0 else 0
             target_mps_val   = current_mps_val * (1 - lev["reduction_pct"])
             current_mps_str  = fmt_duration(current_mps_val)
             target_mps_str   = fmt_duration(target_mps_val)
             card_html = (
-                f'<div style="padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid #2D3748; '
-                f'border-left: 4px solid {border_color}; background: #1E293B; margin-bottom: 0.75rem; '
+                f'<div style="padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid {C_BORDER}; '
+                f'border-left: 4px solid {border_color}; background: {C_SURFACE}; margin-bottom: 0.75rem; '
+                f'box-shadow: 0 1px 2px rgba(60,64,67,0.12); '
                 f'display: flex; align-items: center; justify-content: center; text-align: center;">'
                 f'<div style="flex: 1; min-width: 0;">'
-                f'<div style="font-size: 0.8rem; font-weight: 600; color: #9CA3AF;">#{i+1}: Press {lev["press"]}</div>'
-                f'<div style="font-size: 0.95rem; font-weight: 700; color: #FFFFFF; text-transform: uppercase;">{label}</div>'
+                f'<div style="font-size: 0.8rem; font-weight: 600; color: {C_MUTED};">#{i+1}: Press {lev["press"]}</div>'
+                f'<div style="font-size: 0.95rem; font-weight: 700; color: {C_TEXT}; text-transform: uppercase;">{label}</div>'
                 f'</div>'
                 f'<div style="flex: 1.5; display: flex; flex-direction: column; justify-content: center; '
-                f'border-left: 1px solid #334155; border-right: 1px solid #334155; margin: 0 0.5rem; padding: 0 0.5rem;">'
-                f'<div style="font-size: 0.85rem; font-weight: 700; color: #FFFFFF;">'
-                f'<span style="color: #9CA3AF; font-weight: 400; font-size: 0.85rem;">SHIFT GOAL:</span> {target_mps_str}'
+                f'border-left: 1px solid {C_BORDER_SOFT}; border-right: 1px solid {C_BORDER_SOFT}; margin: 0 0.5rem; padding: 0 0.5rem;">'
+                f'<div style="font-size: 0.85rem; font-weight: 700; color: {C_TEXT};">'
+                f'<span style="color: {C_MUTED}; font-weight: 400; font-size: 0.85rem;">SHIFT GOAL:</span> {target_mps_str}'
                 f'</div>'
-                f'<div style="font-size: 0.8rem; color: #EF4444; margin-top: 0.1rem;">'
+                f'<div style="font-size: 0.8rem; color: {C_ALERT}; margin-top: 0.1rem;">'
                 f'<span style="font-size: 0.7rem;">▼</span> Current: {current_mps_str}'
                 f'</div>'
                 f'</div>'
                 f'<div style="flex: 1;">'
-                f'<div style="font-size: 1.5rem; font-weight: 800; color: {border_color}; line-height: 1;">+{fmt_k(lev["closes_sheets"])}</div>'
-                f'<div style="font-size: 0.7rem; font-weight: 600; color: #9CA3AF; text-transform: uppercase; margin-top: 0.2rem;">Sheets</div>'
+                f'<div style="font-size: 1.5rem; font-weight: 800; color: {value_color}; line-height: 1;">+{fmt_k(lev["closes_sheets"])}</div>'
+                f'<div style="font-size: 0.7rem; font-weight: 600; color: {C_MUTED}; text-transform: uppercase; margin-top: 0.2rem;">Sheets</div>'
                 f'</div>'
                 f'</div>'
             )
@@ -382,14 +409,14 @@ if st.session_state.question == "backward":
         fig_wf = go.Figure(go.Waterfall(
             orientation="v", measure=measures, x=labels, y=values,
             text=texts, textposition=positions,
-            textfont=dict(family="IBM Plex Sans", size=11, color=C_WHITE),
-            connector=dict(line=dict(color="#4B5563", width=1, dash="dot")),
-            increasing=dict(marker_color=C_ACCENT),
-            decreasing=dict(marker_color=C_ALERT),
-            totals=dict(marker_color=C_MID),
+            textfont=dict(family="IBM Plex Sans", size=11, color=C_TEXT),
+            connector=dict(line=dict(color=C_BORDER, width=1, dash="dot")),
+            increasing=dict(marker_color=C_BAR_BLUE),
+            decreasing=dict(marker_color=C_BAR_RED),
+            totals=dict(marker_color=C_BAR_NEUTRAL),
         ))
         fig_wf.update_layout(
-            height=350, margin=dict(l=0, r=20, t=40, b=0),
+            height=360, margin=dict(l=12, r=24, t=40, b=14),
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             showlegend=False, xaxis=dict(visible=False),
             yaxis=dict(visible=False, range=[current*.97, target*1.02]),
@@ -402,7 +429,7 @@ if st.session_state.question == "backward":
 # LOSSES — Biggest Issues
 # ══════════════════════════════════════════════════════════════════════════
 elif st.session_state.question == "losses":
-    if "group_fleet_losses" not in st.session_state: st.session_state.group_fleet_losses = False
+    if "group_fleet_losses" not in st.session_state: st.session_state.group_fleet_losses = True
 
     col_title, col_btn = st.columns([4, 1], vertical_alignment="bottom")
     with col_title:
@@ -451,17 +478,19 @@ elif st.session_state.question == "losses":
 
     bar_vals   = [l["sheets_gained"] for l in levers]
     bar_hrs    = [l["hours_saved"] for l in levers]
-    bar_colors = [C_OK if i == 0 else C_ACCENT if i <= 2 else C_MID for i in range(top_n)]
+    bar_colors = [C_OK if i == 0 else C_ACCENT if i <= 2 else C_BAR_NEUTRAL for i in range(top_n)]
+    # Ranked bars are saturated (white labels); the neutral tail is light (dark labels)
+    bar_text_colors = [text_on(c) for c in bar_colors]
 
     fig = go.Figure(go.Bar(
         x=bar_vals, y=bar_labels, orientation="h", marker_color=bar_colors,
         text=bar_text, textposition="auto", insidetextanchor="start",
-        textfont=dict(family="IBM Plex Sans", size=13, color=C_WHITE),
+        textfont=dict(family="IBM Plex Sans", size=13, color=bar_text_colors),
         hovertemplate="<b>%{y}</b><br>+%{x:,.0f} sheets (100% recovery)<br>%{customdata[0]:.1f} Total Hrs · <b>%{customdata[1]}</b><extra></extra>",
         customdata=list(zip(bar_hrs, bar_mps)),
     ))
     fig.update_layout(
-        height=top_n * 35, margin=dict(l=0, r=0, t=10, b=0),
+        height=top_n * 35 + 24, margin=dict(l=12, r=12, t=14, b=14),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(visible=False), yaxis=dict(visible=False, autorange="reversed"),
         showlegend=False,
@@ -503,9 +532,9 @@ elif st.session_state.question == "plan":
     new_total    = current + total_gained
     gap_closed   = round(total_gained / gap * 100, 1) if gap > 0 else 100
 
-    bar_color   = C_OK if gap_closed >= 100 else C_ACCENT
+    bar_color   = C_OK_TEXT if gap_closed >= 100 else C_ACCENT
     callout_cls = "result-callout success" if gap_closed >= 100 else "result-callout"
-    st.markdown(f'<div class="{callout_cls}" style="padding:0.6rem 1rem;display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;"><div style="display:flex;align-items:baseline;gap:0.8rem;"><span style="font-size:1rem;letter-spacing:0.12em;text-transform:uppercase;color:{C_MUTED};">Plan total</span><span style="font-family:\'IBM Plex Mono\',monospace;font-size:1.5rem;font-weight:700;color:{bar_color};">+{fmt_k(total_gained)}</span></div><div style="font-size:1rem;color:{C_MUTED};">New total: <span style="color:{C_WHITE};">{fmt_k(new_total)}</span> &nbsp;·&nbsp; Gap closed: <span style="color:{C_WHITE};">{gap_closed:.0f}%</span> &nbsp;·&nbsp; <span style="color:{C_WHITE};">{fmt_hrs(total_hrs)}</span> recovered</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="{callout_cls}" style="padding:0.6rem 1rem;display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;"><div style="display:flex;align-items:baseline;gap:0.8rem;"><span style="font-size:1rem;letter-spacing:0.12em;text-transform:uppercase;color:{C_MUTED};">Plan total</span><span style="font-family:\'IBM Plex Mono\',monospace;font-size:1.5rem;font-weight:700;color:{bar_color};">+{fmt_k(total_gained)}</span></div><div style="font-size:1rem;color:{C_MUTED};">New total: <span style="color:{C_TEXT};">{fmt_k(new_total)}</span> &nbsp;·&nbsp; Gap closed: <span style="color:{C_TEXT};">{gap_closed:.0f}%</span> &nbsp;·&nbsp; <span style="color:{C_TEXT};">{fmt_hrs(total_hrs)}</span> recovered</div></div>', unsafe_allow_html=True)
 
     col_p, col_c, col_pct, col_prev, col_add = st.columns([1.5, 2.5, 1.5, 2.5, 1.2])
     with col_p:   add_press = st.selectbox("Press", options=["All"] + list(active_by_id.keys()), key="plan_press")
@@ -533,12 +562,12 @@ elif st.session_state.question == "plan":
         else:
             prev_m_str = ""
         st.markdown(
-            f'<div style="margin-top:1.73rem;background:{C_MID};border:1px solid #4B5563;border-radius:4px;'
+            f'<div style="margin-top:1.73rem;background:{C_SURFACE};border:1px solid {C_BORDER};border-radius:4px;'
             f'padding:0.65rem 0.5rem;display:flex;justify-content:center;align-items:center;gap:0.8rem;line-height:1.2;">'
             f'<div style="text-align:center;">'
-            f'<span style="font-family:\'IBM Plex Mono\',monospace;color:{C_OK};font-size:1.05rem;font-weight:700;">+{fmt_k(p_gain)}</span>'
+            f'<span style="font-family:\'IBM Plex Mono\',monospace;color:{C_OK_TEXT};font-size:1.05rem;font-weight:700;">+{fmt_k(p_gain)}</span>'
             f'{warn_msg}</div>'
-            + (f'<div style="text-align:center;border-left:1px solid #4B5563;padding-left:0.8rem;">'
+            + (f'<div style="text-align:center;border-left:1px solid {C_BORDER};padding-left:0.8rem;">'
                f'<span style="font-size:0.78rem;color:{C_MUTED};">{prev_m_str}</span></div>' if prev_m_str else '')
             + f'</div>', unsafe_allow_html=True)
 
@@ -549,7 +578,7 @@ elif st.session_state.question == "plan":
             st.rerun()
 
     st.markdown('<div class="section-label" style="margin-top:1.5rem;margin-bottom:0.5rem;">Visualized Plan Growth</div>', unsafe_allow_html=True)
-    bar_colors_list = [C_OK, C_ACCENT, "#F59E0B", "#06B6D4", "#8B5CF6", "#EC4899", "#14B8A6"]
+    bar_colors_list = SERIES_COLORS
 
     committed_slices_html = ""
     for i, r in enumerate(results):
@@ -579,7 +608,7 @@ elif st.session_state.question == "plan":
         elif w >= 12: inner = f'<span style="padding-left:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{display_press} &nbsp;&nbsp;<b>+{fmt_k(r["sheets_gained"])}</b></span>'
         elif w >= 5:  inner = f'<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{short_p} <b>+{fmt_k(r["sheets_gained"])}</b></span>'
         else:         inner = ""
-        committed_slices_html += f'<div title="{full_info}" style="width:{w}%;background:{bg_color};height:100%;display:flex;align-items:center;justify-content:center;border-right:1px solid {C_DARK};overflow:hidden;font-size:0.85rem;color:white;">{inner}</div>'
+        committed_slices_html += f'<div title="{full_info}" style="width:{w}%;background:{bg_color};height:100%;display:flex;align-items:center;justify-content:center;border-right:1px solid {C_SURFACE};overflow:hidden;font-size:0.85rem;color:{text_on(bg_color)};">{inner}</div>'
 
     ghost_html        = ""
     preview_gap_closed = gap_closed
@@ -593,9 +622,9 @@ elif st.session_state.question == "plan":
         elif g_w >= 12: inner_g = f'<span style="padding-left:0.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{pre_p} &nbsp;&nbsp;<b>+{fmt_k(p_gain)}</b></span>'
         elif g_w >= 5:  inner_g = f'<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{short_pre_p} <b>+{fmt_k(p_gain)}</b></span>'
         else:           inner_g = ""
-        ghost_html = f'<div title="PREVIEW: +{fmt_k(p_gain)}" style="width:{g_w}%;background:{g_color};opacity:0.6;height:100%;display:flex;align-items:center;justify-content:center;border:1px dashed white;overflow:hidden;font-size:0.85rem;color:white;">{inner_g}</div>'
+        ghost_html = f'<div title="PREVIEW: +{fmt_k(p_gain)}" style="width:{g_w}%;background:{g_color};opacity:0.5;height:100%;display:flex;align-items:center;justify-content:center;border:1px dashed {C_TEXT};overflow:hidden;font-size:0.85rem;color:{C_TEXT};">{inner_g}</div>'
 
-    st.markdown(f'<div style="background:{C_MID};border-radius:6px;height:50px;width:100%;display:flex;overflow:hidden;border:2px solid {C_MID};">{committed_slices_html}{ghost_html}</div><div style="display:flex;justify-content:space-between;font-size:0.75rem;color:{C_MUTED};margin-top:0.4rem;"><span>Current: {fmt_k(current)}</span><span style="color:{C_WHITE};font-weight:600;">{preview_gap_closed:.0f}% of Gap Closed {"(Preview)" if add_pct > 0 else ""}</span><span>Target: {fmt_k(target)}</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="background:{C_BORDER_SOFT};border-radius:6px;height:50px;width:100%;display:flex;overflow:hidden;border:1px solid {C_BORDER};">{committed_slices_html}{ghost_html}</div><div style="display:flex;justify-content:space-between;font-size:0.75rem;color:{C_MUTED};margin-top:0.4rem;"><span>Current: {fmt_k(current)}</span><span style="color:{C_TEXT};font-weight:600;">{preview_gap_closed:.0f}% of Gap Closed {"(Preview)" if add_pct > 0 else ""}</span><span>Target: {fmt_k(target)}</span></div>', unsafe_allow_html=True)
 
     if results:
         st.markdown('<div class="section-label" style="margin-top:1.5rem;margin-bottom:0.5rem;">Active Levers</div>', unsafe_allow_html=True)
@@ -621,7 +650,7 @@ elif st.session_state.question == "plan":
 
             col_txt, col_del = st.columns([15, 1])
             with col_txt:
-                st.markdown(f'<div style="font-size:0.85rem;color:{C_MUTED};display:flex;align-items:center;gap:10px;padding-top:0.3rem;"><div style="width:10px;height:10px;background:{bar_colors_list[i % len(bar_colors_list)]};border-radius:2px;"></div><span style="color:{C_WHITE};font-weight:600;">{display_p}</span><span>{label}</span><span style="margin-left:auto;font-family:\'IBM Plex Mono\';color:{C_OK};font-weight:600;">+{fmt_k(r["sheets_gained"])}</span><span style="opacity:0.7;font-size:0.8rem;margin-left:10px;">({m_str})</span></div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="font-size:0.85rem;color:{C_MUTED};display:flex;align-items:center;gap:10px;padding-top:0.3rem;"><div style="width:10px;height:10px;background:{bar_colors_list[i % len(bar_colors_list)]};border-radius:2px;"></div><span style="color:{C_TEXT};font-weight:600;">{display_p}</span><span>{label}</span><span style="margin-left:auto;font-family:\'IBM Plex Mono\';color:{C_OK_TEXT};font-weight:600;">+{fmt_k(r["sheets_gained"])}</span><span style="opacity:0.7;font-size:0.8rem;margin-left:10px;">({m_str})</span></div>', unsafe_allow_html=True)
             with col_del:
                 if st.button("✕", key=f"del_{i}"): to_remove = i
         if to_remove is not None: st.session_state.plan_moves.pop(to_remove); st.rerun()
@@ -726,9 +755,9 @@ elif st.session_state.question == "deep_dive":
         for i, (cat_key, codes) in enumerate(code_labels_by_category(_active_presses).items()):
             with map_cols[i % 4]:
                 st.markdown(f"""
-                    <div style="background:{C_MID}; padding:0.8rem; border-radius:4px; border-left:3px solid {C_ACCENT}; margin-bottom:0.8rem; min-height:85px;">
-                        <div style="font-size:0.65rem; color:#9CA3AF; text-transform:uppercase; letter-spacing:0.1em; font-weight:700;">{LEVER_LABELS.get(cat_key, cat_key)}</div>
-                        <div style="font-family:'IBM Plex Mono', monospace; font-size:0.82rem; color:{C_WHITE}; margin-top:0.4rem; line-height:1.4;">{"<br>".join(codes)}</div>
+                    <div style="background:{C_SURFACE}; border:1px solid {C_BORDER}; padding:0.8rem; border-radius:8px; border-left:3px solid {C_ACCENT}; margin-bottom:0.8rem; min-height:85px;">
+                        <div style="font-size:0.65rem; color:{C_MUTED}; text-transform:uppercase; letter-spacing:0.1em; font-weight:700;">{LEVER_LABELS.get(cat_key, cat_key)}</div>
+                        <div style="font-family:'IBM Plex Mono', monospace; font-size:0.82rem; color:{C_TEXT}; margin-top:0.4rem; line-height:1.4;">{"<br>".join(codes)}</div>
                     </div>
                 """, unsafe_allow_html=True)
 
